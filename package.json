@@ -10,6 +10,6 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "usb": "^2.15.0"
+    "serialport": "^13.0.0"
   }
 }
