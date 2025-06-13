@@ -31,14 +31,6 @@ function openSerialPort() {
   // 串口打开事件
   port.on('open', () => {
     console.log('串口已成功打开。');
-
-    // 模块上电后需要 600ms 才能正常工作
-    // 建议等待至少 1 秒，以确保模块稳定并准备好接收命令。
-    setTimeout(() => {
-      console.log(`发送 "${AT_MODE_ENTRY_CMD}" 尝试进入 AT 指令模式...`);
-      // 发送进入 AT 模式的命令，不带回车换行符
-      sendData(AT_MODE_ENTRY_CMD, false);
-    }, 1000);
   });
 
   // 监听数据接收事件
@@ -94,6 +86,8 @@ function sleep(ms) {
 async function main() {
   openSerialPort();
 
+  await sleep(2000);
+
   await sendAndSleep('AT+RESTART', 1000);
 
   await sendAndSleep('+++', 1000, false);
@@ -118,6 +112,5 @@ process.on('SIGINT', () => {
   closeSerialPort();
   process.exit();
 });
-
 
 main();
