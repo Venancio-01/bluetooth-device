@@ -84,50 +84,34 @@ function closeSerialPort() {
       }
     });
   }
+
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function main() {
+  openSerialPort();
+
+  await sendAndSleep('AT+RESTART', 1000);
+
+  await sendAndSleep('+++', 1000, false);
+
+  await sendAndSleep('AT+ROLE=1', 1000);
+
+  await sendAndSleep('AT+RESTART', 3000);
+
+  await sendAndSleep('+++', 2000, false);
+
+  await sendAndSleep('AT+OBSERVER=1', 1000);
 }
 
 
-openSerialPort();
-
-// function sleep(ms) {
-//   return new Promise(resolve => setTimeout(resolve, ms));
-// }
-
-let interval = 1000;
-
-setTimeout(() => {
-  sendData('AT+RESTART', true);
-}, interval);
-
-interval += 1000;
-
-setTimeout(() => {
-  sendData('+++', false);
-}, interval);
-
-interval += 1000;
-
-setTimeout(() => {
-  sendData('AT+ROLE=1', true);
-}, interval);
-
-interval += 1000;
-
-setTimeout(() => {
-  sendData('AT+RESTART', true);
-}, 1000);
-
-interval += 2000;
-
-setTimeout(() => {
-  sendData('+++', false);
-}, interval);
-
-interval += 2000;
-
-setTimeout(() => {
-  sendData('AT+OBSERVER=1', true);
-}, interval);
+async function sendAndSleep(data, sleepTime, newline = true) {
+  sendData(data, newline);
+  await sleep(sleepTime);
+}
 
 process.on('SIGINT', () => {
   console.log('\n检测到 SIGINT，正在关闭串口...');
