@@ -98,7 +98,6 @@ async function main() {
   await sendAndSleep('AT+OBSERVER=1,12,,,-60,4C00', 0);
 }
 
-
 async function sendAndSleep(data, sleepTime, newline = true) {
   sendData(data, newline);
   await sleep(sleepTime);
