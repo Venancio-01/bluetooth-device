@@ -90,7 +90,7 @@ function closeSerialPort() {
 openSerialPort();
 
 setTimeout(() => {
-  sendData(QUERY_DEVICE_NAME_CMD, true);
+  sendData('AT+OBSERVER=1', true);
 }, 2000);
 
 process.on('SIGINT', () => {
