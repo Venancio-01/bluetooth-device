@@ -118,3 +118,6 @@ process.on('SIGINT', () => {
   closeSerialPort();
   process.exit();
 });
+
+
+main();
