@@ -4,9 +4,6 @@ const { ReadlineParser } = require('@serialport/parser-readline');
 const SERIAL_PORT_PATH = '/dev/ttyUSB0';
 const BAUD_RATE = 115200;
 
-const AT_MODE_ENTRY_CMD = '+++'; // 进入 AT 模式的命令，不需要回车换行符
-const AT_MODE_ENTRY_RESPONSE = 'OK'; // 进入 AT 模式后模块返回的响应
-const QUERY_DEVICE_NAME_CMD = 'AT+NAME?'; // 查询设备名称的 AT 指令
 const AT_COMMAND_SUFFIX = '\r\n'; // 所有 AT 命令都必须以回车换行符结尾
 
 let port;
@@ -98,7 +95,7 @@ async function main() {
 
   await sendAndSleep('+++', 2000, false);
 
-  await sendAndSleep('AT+OBSERVER=1', 1000);
+  await sendAndSleep('AT+OBSERVER=1,12,,,-60,4C00', 0);
 }
 
 
@@ -114,3 +111,19 @@ process.on('SIGINT', () => {
 });
 
 main();
+
+
+function parseData(data) {
+  const demo = 'MAC:45:57:BC:FB:0F:09,RSSI:-87,ADV:02011A020A0C0AFF4C0010051A18A0D043'
+  const adv = demo.split(',')[2].split(':')[1];
+
+  const splitAdv = adv.substring(14, 16)
+
+  if (splitAdv === 'FF') {
+    const targetStr = adv.substring(18, 20) + adv.substring(16, 18)
+    console.log(targetStr)
+  }
+}
+
+parseData('02 01 1A 02 0A 0C 0A FF 4C0010051A18A0D043');
+
