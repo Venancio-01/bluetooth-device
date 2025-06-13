@@ -64,17 +64,13 @@ function closeSerialPort() {
   }
 }
 
-// --- 示例使用 ---
 
 openSerialPort();
 
-// 延迟一段时间，等待串口完全打开
 setTimeout(() => {
-  // 尝试发送一些数据给硬件
-  sendData('+++');
-}, 2000); // 2秒后开始发送数据
+  sendData('AT+RESTART');
+}, 2000);
 
-// 在程序退出时关闭串口 (例如，通过 Ctrl+C)
 process.on('SIGINT', () => {
   console.log('\n检测到 SIGINT，正在关闭串口...');
   closeSerialPort();
