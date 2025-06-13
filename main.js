@@ -89,9 +89,45 @@ function closeSerialPort() {
 
 openSerialPort();
 
+// function sleep(ms) {
+//   return new Promise(resolve => setTimeout(resolve, ms));
+// }
+
+let interval = 1000;
+
+setTimeout(() => {
+  sendData('AT+RESTART', true);
+}, interval);
+
+interval += 1000;
+
+setTimeout(() => {
+  sendData('+++', false);
+}, interval);
+
+interval += 1000;
+
+setTimeout(() => {
+  sendData('AT+ROLE=1', true);
+}, interval);
+
+interval += 1000;
+
+setTimeout(() => {
+  sendData('AT+RESTART', true);
+}, 1000);
+
+interval += 2000;
+
+setTimeout(() => {
+  sendData('+++', false);
+}, interval);
+
+interval += 2000;
+
 setTimeout(() => {
   sendData('AT+OBSERVER=1', true);
-}, 2000);
+}, interval);
 
 process.on('SIGINT', () => {
   console.log('\n检测到 SIGINT，正在关闭串口...');
