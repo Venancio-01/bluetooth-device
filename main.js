@@ -68,7 +68,7 @@ function closeSerialPort() {
 openSerialPort();
 
 setTimeout(() => {
-  sendData('AT+RESTART');
+  sendData('AT+NAME?');
 }, 2000);
 
 process.on('SIGINT', () => {
