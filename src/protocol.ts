@@ -4,7 +4,8 @@ const AT_COMMAND_MODE = '+++' // 进入AT命令模式,无需回车换行符
 
 const AT_RESTART = 'RESTART'
 const AT_ROLE = 'ROLE=1'
-const AT_OBSERVER = 'OBSERVER=1,4,,,'
+const AT_START_OBSERVER = 'OBSERVER=1,4,,,'
+const AT_STOP_OBSERVER = 'OBSERVER=0'
 
 /**
  * 进入AT命令模式
@@ -32,5 +33,12 @@ export function buildRoleCommand() {
  */
 export function buildObserverCommand(rssi = 60) {
   const defaultRssi = `-${rssi}`
-  return `${AT_COMMAND_PREFIX}+${AT_OBSERVER}${defaultRssi}${AT_COMMAND_SUFFIX}`
+  return `${AT_COMMAND_PREFIX}+${AT_START_OBSERVER}${defaultRssi}${AT_COMMAND_SUFFIX}`
+}
+
+/**
+ * 停止观察者模式
+ */
+export function buildStopObserverCommand() {
+  return `${AT_COMMAND_PREFIX}+${AT_STOP_OBSERVER}${AT_COMMAND_SUFFIX}`
 }

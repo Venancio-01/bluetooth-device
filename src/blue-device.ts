@@ -1,3 +1,4 @@
+import { EventEmitter } from 'events'
 import { ReadlineParser } from '@serialport/parser-readline'
 import { SerialPort } from 'serialport'
 import { buildEnterCommandMode, buildObserverCommand, buildRestartCommand, buildRoleCommand } from './protocol'
@@ -15,11 +16,13 @@ const MANUFACTURER_DICT = {
   '00EO': 'Google',
 } as const
 
-export class BlueDevice {
+export class BlueDevice extends EventEmitter {
   private port: SerialPort | null = null
   private initializeState: 'uninitialized' | 'initializing' | 'initialized' = 'uninitialized'
+  private isScanning = false
 
   constructor() {
+    super()
     this.port = null
   }
 
@@ -89,6 +92,7 @@ export class BlueDevice {
       const manufacturer = MANUFACTURER_DICT[targetStr as keyof typeof MANUFACTURER_DICT]
       if (manufacturer) {
         console.log('manufacturer', manufacturer)
+        this.emit('device', { mf: manufacturer })
       }
     }
   }
@@ -96,6 +100,7 @@ export class BlueDevice {
   async sendAndSleep(data: string, sleepTime: number) {
     await this.send(data)
     await sleep(sleepTime)
+    this.initializeState = 'initialized'
   }
 
   async initialize() {
@@ -123,7 +128,7 @@ export class BlueDevice {
     this.initializeState = 'initialized'
   }
 
-  async scan(rssi: number) {
+  async startScan(rssi = 60) {
     if (this.initializeState === 'uninitialized') {
       await this.initialize()
     }
@@ -132,8 +137,17 @@ export class BlueDevice {
       console.log('设备初始化中，请稍后再试')
       return
     }
-
+    this.isScanning = true
     // 设置设备为观察者模式
     await this.sendAndSleep(buildObserverCommand(rssi), 0)
+  }
+
+  async stopScan() {
+    if (!this.isScanning) {
+      return
+    }
+    // 通过重启设备来停止扫描
+    await this.sendAndSleep(buildRestartCommand(), 1000)
+    this.isScanning = false
   }
 }
