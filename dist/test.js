@@ -6,15 +6,15 @@ import axios from "axios";
 import { EventSource } from "eventsource";
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
-var BASE_URL = "http://192.168.110.218:8888";
+var BASE_PORT = 8888;
 var CommandCode = {
   START: 1,
   HEARTBEAT: 2,
   STOP: 3
 };
-async function sendCommand(command, data = {}) {
+async function sendCommand(host, command, data = {}) {
   try {
-    const response = await axios.post(`${BASE_URL}/command`, {
+    const response = await axios.post(`http://${host}:${BASE_PORT}/command`, {
       c: command,
       d: data
     });
@@ -39,14 +39,19 @@ async function sendCommand(command, data = {}) {
     }
   }
 }
-yargs(hideBin(process.argv)).scriptName("test-client").command(
+yargs(hideBin(process.argv)).scriptName("test-client").option("host", {
+  alias: "h",
+  type: "string",
+  default: "127.0.0.1",
+  describe: "\u670D\u52A1\u5668\u7684\u4E3B\u673A\u540D\u6216IP\u5730\u5740"
+}).command(
   "heartbeat",
   "Send heartbeat command",
   () => {
   },
-  async () => {
+  async (argv) => {
     console.log("Sending [heartbeat] command...");
-    await sendCommand(CommandCode.HEARTBEAT);
+    await sendCommand(argv.host, CommandCode.HEARTBEAT);
   }
 ).command(
   "start",
@@ -64,25 +69,25 @@ yargs(hideBin(process.argv)).scriptName("test-client").command(
       data.rssi = argv.rssi;
       console.log(`  - \u4F7F\u7528 RSSI \u9608\u503C: >= ${argv.rssi}`);
     }
-    await sendCommand(CommandCode.START, data);
+    await sendCommand(argv.host, CommandCode.START, data);
   }
 ).command(
   "stop",
   "Send stop scan command",
   () => {
   },
-  async () => {
+  async (argv) => {
     console.log("Sending [stop] command...");
-    await sendCommand(CommandCode.STOP);
+    await sendCommand(argv.host, CommandCode.STOP);
   }
 ).command(
   "listen",
   "Listen for device events from the server",
   () => {
   },
-  () => {
+  (argv) => {
     console.log("Listening for events from server...");
-    const es = new EventSource(`${BASE_URL}/events`);
+    const es = new EventSource(`http://${argv.host}:${BASE_PORT}/events`);
     es.onmessage = (event) => {
       console.log("\u{1F4E9}  Received event:");
       console.log(JSON.parse(event.data));

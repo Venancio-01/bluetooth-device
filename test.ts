@@ -7,7 +7,7 @@ import { EventSource } from 'eventsource'
 import yargs from 'yargs'
 import { hideBin } from 'yargs/helpers'
 
-const BASE_URL = 'http://192.168.110.218:8888'
+const BASE_PORT = 8888
 
 // 命令码 (与 src/communication.ts 一致)
 const CommandCode = {
@@ -16,9 +16,9 @@ const CommandCode = {
   STOP: 3,
 }
 
-async function sendCommand(command: number, data = {}) {
+async function sendCommand(host: string, command: number, data = {}) {
   try {
-    const response = await axios.post(`${BASE_URL}/command`, {
+    const response = await axios.post(`http://${host}:${BASE_PORT}/command`, {
       c: command,
       d: data,
     })
@@ -54,13 +54,19 @@ async function sendCommand(command: number, data = {}) {
 
 yargs(hideBin(process.argv))
   .scriptName('test-client')
+  .option('host', {
+    alias: 'h',
+    type: 'string',
+    default: '127.0.0.1',
+    describe: '服务器的主机名或IP地址',
+  })
   .command(
     'heartbeat',
     'Send heartbeat command',
     () => {},
-    async () => {
+    async (argv) => {
       console.log('Sending [heartbeat] command...')
-      await sendCommand(CommandCode.HEARTBEAT)
+      await sendCommand(argv.host, CommandCode.HEARTBEAT)
     },
   )
   .command(
@@ -79,25 +85,25 @@ yargs(hideBin(process.argv))
         data.rssi = argv.rssi
         console.log(`  - 使用 RSSI 阈值: >= ${argv.rssi}`)
       }
-      await sendCommand(CommandCode.START, data)
+      await sendCommand(argv.host, CommandCode.START, data)
     },
   )
   .command(
     'stop',
     'Send stop scan command',
     () => {},
-    async () => {
+    async (argv) => {
       console.log('Sending [stop] command...')
-      await sendCommand(CommandCode.STOP)
+      await sendCommand(argv.host, CommandCode.STOP)
     },
   )
   .command(
     'listen',
     'Listen for device events from the server',
     () => {},
-    () => {
+    (argv) => {
       console.log('Listening for events from server...')
-      const es = new EventSource(`${BASE_URL}/events`)
+      const es = new EventSource(`http://${argv.host}:${BASE_PORT}/events`)
       es.onmessage = (event: MessageEvent) => {
         console.log('📩  Received event:')
         console.log(JSON.parse(event.data))
