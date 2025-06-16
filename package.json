@@ -10,7 +10,7 @@
   "scripts": {
     "dev": "tsup --watch",
     "build": "tsup",
-    "start": "node dist/index.js"
+    "start": "node dist/src/index.js"
   },
   "dependencies": {
     "@serialport/parser-readline": "^13.0.0",
