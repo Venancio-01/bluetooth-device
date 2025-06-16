@@ -247,7 +247,7 @@ var HttpTransport = class extends EventEmitter2 {
     });
   };
   setupRoutes = () => {
-    this.app.post("/command", express.text({ type: "*/*" }), (req, res) => {
+    this.app.post("/command", express.json(), (req, res) => {
       const cb = (response) => {
         res.status(200).send(response);
       };

@@ -49,7 +49,7 @@ export class HttpTransport extends EventEmitter implements ITransport {
   }
 
   private setupRoutes = () => {
-    this.app.post('/command', express.text({ type: '*/*' }), (req: express.Request, res: express.Response) => {
+    this.app.post('/command', express.json(), (req: express.Request, res: express.Response) => {
       const cb: ResponseCallback = (response) => {
         res.status(200).send(response)
       }
