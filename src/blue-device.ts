@@ -17,7 +17,7 @@ const MANUFACTURER_DICT = {
 
 export class BlueDevice {
   private port: SerialPort | null = null
-  private isInitialized = false
+  private initializeState: 'uninitialized' | 'initializing' | 'initialized' = 'uninitialized'
 
   constructor() {
     this.port = null
@@ -76,7 +76,6 @@ export class BlueDevice {
 
   async parseData(data: string) {
     const advStr = data.split(',')?.[2]?.split(':')?.[1]
-    console.log('advStr', advStr)
 
     if (!advStr) {
       return
@@ -84,12 +83,13 @@ export class BlueDevice {
 
     const splitStrIndex = advStr.indexOf('FF')
     const splitStr = advStr.substring(splitStrIndex, splitStrIndex + 2)
-    console.log('splitStr', splitStr)
 
     if (splitStr === 'FF') {
       const targetStr = advStr.substring(splitStrIndex + 4, splitStrIndex + 6) + advStr.substring(splitStrIndex + 2, splitStrIndex + 4)
       const manufacturer = MANUFACTURER_DICT[targetStr as keyof typeof MANUFACTURER_DICT]
-      console.log('manufacturer', manufacturer)
+      if (manufacturer) {
+        console.log('manufacturer', manufacturer)
+      }
     }
   }
 
@@ -99,9 +99,11 @@ export class BlueDevice {
   }
 
   async initialize() {
-    if (this.isInitialized) {
+    if (this.initializeState === 'initializing' || this.initializeState === 'initialized') {
       return
     }
+
+    this.initializeState = 'initializing'
 
     // 重启设备
     await this.sendAndSleep(buildRestartCommand(), 1000)
@@ -118,15 +120,20 @@ export class BlueDevice {
     // 进入AT命令模式
     await this.sendAndSleep(buildEnterCommandMode(), 2000)
 
-    this.isInitialized = true
+    this.initializeState = 'initialized'
   }
 
-  async scan() {
-    if (!this.isInitialized) {
+  async scan(rssi: number) {
+    if (this.initializeState === 'uninitialized') {
       await this.initialize()
     }
 
+    if (this.initializeState === 'initializing') {
+      console.log('设备初始化中，请稍后再试')
+      return
+    }
+
     // 设置设备为观察者模式
-    await this.sendAndSleep(buildObserverCommand(), 0)
+    await this.sendAndSleep(buildObserverCommand(rssi), 0)
   }
 }
