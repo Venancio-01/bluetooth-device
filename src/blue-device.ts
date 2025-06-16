@@ -76,15 +76,18 @@ export class BlueDevice {
 
   async parseData(data: string) {
     const advStr = data.split(',')?.[2]?.split(':')?.[1]
+    console.log('advStr', advStr)
 
     if (!advStr) {
       return
     }
 
-    const splitStr = advStr.substring(14, 16)
+    const splitStrIndex = advStr.indexOf('FF')
+    const splitStr = advStr.substring(splitStrIndex, splitStrIndex + 2)
+    console.log('splitStr', splitStr)
 
     if (splitStr === 'FF') {
-      const targetStr = advStr.substring(18, 20) + advStr.substring(16, 18)
+      const targetStr = advStr.substring(splitStrIndex + 4, splitStrIndex + 6) + advStr.substring(splitStrIndex + 2, splitStrIndex + 4)
       const manufacturer = MANUFACTURER_DICT[targetStr as keyof typeof MANUFACTURER_DICT]
       console.log('manufacturer', manufacturer)
     }
