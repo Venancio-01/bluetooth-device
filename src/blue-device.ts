@@ -65,6 +65,7 @@ export class BlueDevice {
   }
 
   async send(data: string) {
+    console.log('发送数据:', data)
     this.port?.write(data, (err) => {
       if (err) {
         console.error('发送数据时出错:', err.message)

@@ -82,6 +82,7 @@ var BlueDevice = class {
     this.port?.close();
   }
   async send(data) {
+    console.log("\u53D1\u9001\u6570\u636E:", data);
     this.port?.write(data, (err) => {
       if (err) {
         console.error("\u53D1\u9001\u6570\u636E\u65F6\u51FA\u9519:", err.message);
