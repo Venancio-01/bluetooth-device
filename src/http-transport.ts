@@ -47,6 +47,8 @@ export class HttpTransport extends EventEmitter implements ITransport {
   }
 
   private handleRequest = (req: IncomingMessage, res: ServerResponse) => {
+    console.log('req.url', req.url)
+    console.log('req.method', req.method)
     if (req.url === '/command' && req.method === 'POST') {
       let body = ''
       req.on('data', (chunk) => {

@@ -245,6 +245,8 @@ var HttpTransport = class extends EventEmitter2 {
     });
   };
   handleRequest = (req, res) => {
+    console.log("req.url", req.url);
+    console.log("req.method", req.method);
     if (req.url === "/command" && req.method === "POST") {
       let body = "";
       req.on("data", (chunk) => {
