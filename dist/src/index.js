@@ -110,6 +110,7 @@ var BlueDevice = class extends EventEmitter {
       const manufacturer = MANUFACTURER_DICT[targetStr];
       if (manufacturer) {
         const hasDevice = this.deleteDeviceList.has(targetStr);
+        console.log("hasDevice", hasDevice);
         if (!hasDevice) {
           console.log("manufacturer", manufacturer);
           this.emit("device", { mf: manufacturer });
