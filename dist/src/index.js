@@ -204,19 +204,21 @@ function parseJSONMessage(message) {
 
 // src/http-transport.ts
 import { EventEmitter as EventEmitter2 } from "events";
-import http from "http";
+import express from "express";
 var HttpTransport = class extends EventEmitter2 {
   server = null;
   sseClients = [];
   port;
+  app;
   constructor(port = 8888) {
     super();
     this.port = port;
+    this.app = express();
+    this.setupRoutes();
   }
   start = async () => {
-    this.server = http.createServer(this.handleRequest);
     return new Promise((resolve) => {
-      this.server?.listen(this.port, () => {
+      this.server = this.app.listen(this.port, () => {
         console.log(`HTTP server listening on http://localhost:${this.port}`);
         resolve();
       });
@@ -226,7 +228,7 @@ var HttpTransport = class extends EventEmitter2 {
     return new Promise((resolve) => {
       this.sseClients.forEach((res) => res.end());
       this.sseClients = [];
-      if (this.server?.listening) {
+      if (this.server) {
         this.server.close(() => {
           console.log("HTTP server stopped");
           resolve();
@@ -244,29 +246,16 @@ var HttpTransport = class extends EventEmitter2 {
 `);
     });
   };
-  handleRequest = (req, res) => {
-    console.log("req.url", req.url);
-    console.log("req.method", req.method);
-    if (req.url === "/command" && req.method === "POST") {
-      let body = "";
-      req.on("data", (chunk) => {
-        body += chunk.toString();
-      });
-      req.on("end", () => {
-        const cb = (response) => {
-          res.writeHead(200, { "Content-Type": "application/json" });
-          res.end(response);
-        };
-        this.emit("data", body, cb);
-      });
-    } else if (req.url === "/events" && req.method === "GET") {
-      this.setupSse(res);
-    } else {
-      res.writeHead(404);
-      res.end();
-    }
+  setupRoutes = () => {
+    this.app.post("/command", express.text({ type: "*/*" }), (req, res) => {
+      const cb = (response) => {
+        res.status(200).send(response);
+      };
+      this.emit("data", req.body, cb);
+    });
+    this.app.get("/events", this.setupSse);
   };
-  setupSse = (res) => {
+  setupSse = (req, res) => {
     res.writeHead(200, {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache",
@@ -294,15 +283,13 @@ function handleMessage(message, cb) {
   switch (request.c) {
     case CommandCode.HEARTBEAT:
       console.log("\u6536\u5230\u5FC3\u8DF3\u6307\u4EE4");
-      return cb(createStatusResponse({ run: true }));
+      return cb(onReviceHeartbeat());
     case CommandCode.START:
       console.log("\u6536\u5230\u542F\u52A8\u626B\u63CF\u6307\u4EE4");
-      blueDevice?.startScan();
-      return cb(createStatusResponse({ msg: "Scan started" }));
+      return cb(onReviceStart(request.d?.["rssi"] || 60));
     case CommandCode.STOP:
       console.log("\u6536\u5230\u505C\u6B62\u626B\u63CF\u6307\u4EE4");
-      blueDevice?.stopScan();
-      return cb(createStatusResponse({ msg: "Scan stopped" }));
+      return cb(onReviceStop());
     default:
       return cb(createErrorResponse({ msg: "Unknown command" }));
   }
@@ -332,6 +319,20 @@ async function main() {
   } catch (error) {
     console.error(error);
   }
+}
+function onReviceHeartbeat() {
+  console.log("\u6536\u5230\u5FC3\u8DF3\u6307\u4EE4");
+  return createStatusResponse({ run: true });
+}
+function onReviceStart(rssi) {
+  console.log("\u6536\u5230\u542F\u52A8\u626B\u63CF\u6307\u4EE4");
+  blueDevice?.startScan(rssi);
+  return createStatusResponse({ msg: "Scan started" });
+}
+function onReviceStop() {
+  console.log("\u6536\u5230\u505C\u6B62\u626B\u63CF\u6307\u4EE4");
+  blueDevice?.stopScan();
+  return createStatusResponse({ msg: "Scan stopped" });
 }
 process.on("SIGINT", () => {
   console.log("\n\u6B63\u5728\u5173\u95ED\u7A0B\u5E8F...");

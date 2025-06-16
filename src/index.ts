@@ -28,17 +28,15 @@ function handleMessage(message: string, cb: ResponseCallback) {
   switch (request.c) {
     case CommandCode.HEARTBEAT:
       console.log('收到心跳指令')
-      return cb(createStatusResponse({ run: true }))
+      return cb(onReviceHeartbeat())
 
     case CommandCode.START:
       console.log('收到启动扫描指令')
-      blueDevice?.startScan()
-      return cb(createStatusResponse({ msg: 'Scan started' }))
+      return cb(onReviceStart(request.d?.['rssi'] as number | undefined || 60))
 
     case CommandCode.STOP:
       console.log('收到停止扫描指令')
-      blueDevice?.stopScan()
-      return cb(createStatusResponse({ msg: 'Scan stopped' }))
+      return cb(onReviceStop())
 
     default:
       return cb(createErrorResponse({ msg: 'Unknown command' }))
@@ -79,6 +77,37 @@ async function main() {
   catch (error) {
     console.error(error)
   }
+}
+
+/**
+ * 处理心跳指令
+ * @param message 心跳指令
+ * @returns 心跳响应
+ */
+function onReviceHeartbeat() {
+  console.log('收到心跳指令')
+  return createStatusResponse({ run: true })
+}
+
+/**
+ * 处理启动扫描指令
+ * @param message 启动扫描指令
+ * @returns 启动扫描响应
+ */
+function onReviceStart(rssi: number) {
+  console.log('收到启动扫描指令')
+  blueDevice?.startScan(rssi)
+  return createStatusResponse({ msg: 'Scan started' })
+}
+
+/**
+ * 处理停止扫描指令
+ * @returns 停止扫描响应
+ */
+function onReviceStop() {
+  console.log('收到停止扫描指令')
+  blueDevice?.stopScan()
+  return createStatusResponse({ msg: 'Scan stopped' })
 }
 
 process.on('SIGINT', () => {

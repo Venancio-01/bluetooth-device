@@ -15,6 +15,7 @@ export default antfu(
       'ts/ban-ts-comment': 'off',
       'eslint-comments/no-unlimited-disable': 'off',
       'ts/consistent-type-definitions': 'off',
+      'dot-notation': 'off',
     },
   },
 )

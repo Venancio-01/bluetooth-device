@@ -1,22 +1,24 @@
-import type { IncomingMessage, Server, ServerResponse } from 'http'
+import type { Server } from 'http'
 import type { ITransport, ResponseCallback } from './transport'
 import { EventEmitter } from 'events'
-import http from 'http'
+import express from 'express'
 
 export class HttpTransport extends EventEmitter implements ITransport {
   private server: Server | null = null
-  private sseClients: ServerResponse[] = []
+  private sseClients: express.Response[] = []
   private readonly port: number
+  private readonly app: express.Express
 
   constructor(port = 8888) {
     super()
     this.port = port
+    this.app = express()
+    this.setupRoutes()
   }
 
   start = async () => {
-    this.server = http.createServer(this.handleRequest)
     return new Promise<void>((resolve) => {
-      this.server?.listen(this.port, () => {
+      this.server = this.app.listen(this.port, () => {
         console.log(`HTTP server listening on http://localhost:${this.port}`)
         resolve()
       })
@@ -27,7 +29,7 @@ export class HttpTransport extends EventEmitter implements ITransport {
     return new Promise<void>((resolve) => {
       this.sseClients.forEach(res => res.end())
       this.sseClients = []
-      if (this.server?.listening) {
+      if (this.server) {
         this.server.close(() => {
           console.log('HTTP server stopped')
           resolve()
@@ -46,32 +48,18 @@ export class HttpTransport extends EventEmitter implements ITransport {
     })
   }
 
-  private handleRequest = (req: IncomingMessage, res: ServerResponse) => {
-    console.log('req.url', req.url)
-    console.log('req.method', req.method)
-    if (req.url === '/command' && req.method === 'POST') {
-      let body = ''
-      req.on('data', (chunk) => {
-        body += chunk.toString()
-      })
-      req.on('end', () => {
-        const cb: ResponseCallback = (response) => {
-          res.writeHead(200, { 'Content-Type': 'application/json' })
-          res.end(response)
-        }
-        this.emit('data', body, cb)
-      })
-    }
-    else if (req.url === '/events' && req.method === 'GET') {
-      this.setupSse(res)
-    }
-    else {
-      res.writeHead(404)
-      res.end()
-    }
+  private setupRoutes = () => {
+    this.app.post('/command', express.text({ type: '*/*' }), (req: express.Request, res: express.Response) => {
+      const cb: ResponseCallback = (response) => {
+        res.status(200).send(response)
+      }
+      this.emit('data', req.body, cb)
+    })
+
+    this.app.get('/events', this.setupSse)
   }
 
-  private setupSse = (res: ServerResponse) => {
+  private setupSse = (req: express.Request, res: express.Response) => {
     res.writeHead(200, {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
