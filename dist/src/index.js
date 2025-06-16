@@ -187,20 +187,6 @@ function createDeviceEvent(data) {
   };
   return JSON.stringify(payload);
 }
-function parseJSONMessage(message) {
-  try {
-    const json = JSON.parse(message);
-    const validation = RequestSchema.safeParse(json);
-    if (validation.success) {
-      return validation.data;
-    }
-    console.error("Invalid message format:", validation.error);
-    return null;
-  } catch (error) {
-    console.error("Failed to parse JSON message:", error);
-    return null;
-  }
-}
 
 // src/http-transport.ts
 import { EventEmitter as EventEmitter2 } from "events";
@@ -280,24 +266,29 @@ var HttpTransport = class extends EventEmitter2 {
 // src/index.ts
 var blueDevice = null;
 var transport = null;
-function handleMessage(message, cb) {
-  const request = parseJSONMessage(message);
+async function handleMessage(message, cb) {
+  const request = message;
   if (!request) {
     const errorResponse = createErrorResponse({ msg: "Invalid message format" });
     return cb(errorResponse);
   }
-  switch (request.c) {
-    case CommandCode.HEARTBEAT:
-      console.log("\u6536\u5230\u5FC3\u8DF3\u6307\u4EE4");
-      return cb(onReviceHeartbeat());
-    case CommandCode.START:
-      console.log("\u6536\u5230\u542F\u52A8\u626B\u63CF\u6307\u4EE4");
-      return cb(onReviceStart(request.d?.["rssi"] || 60));
-    case CommandCode.STOP:
-      console.log("\u6536\u5230\u505C\u6B62\u626B\u63CF\u6307\u4EE4");
-      return cb(onReviceStop());
-    default:
-      return cb(createErrorResponse({ msg: "Unknown command" }));
+  try {
+    switch (request.c) {
+      case CommandCode.HEARTBEAT:
+        console.log("\u6536\u5230\u5FC3\u8DF3\u6307\u4EE4");
+        return cb(onReviceHeartbeat());
+      case CommandCode.START:
+        console.log("\u6536\u5230\u542F\u52A8\u626B\u63CF\u6307\u4EE4");
+        return cb(await onReviceStart(request.d?.["rssi"] || 60));
+      case CommandCode.STOP:
+        console.log("\u6536\u5230\u505C\u6B62\u626B\u63CF\u6307\u4EE4");
+        return cb(await onReviceStop());
+      default:
+        return cb(createErrorResponse({ msg: "Unknown command" }));
+    }
+  } catch (error) {
+    console.error("\u5904\u7406\u6307\u4EE4\u65F6\u53D1\u751F\u9519\u8BEF:", error);
+    return cb(createErrorResponse({ msg: error.message || "Failed to execute command" }));
   }
 }
 async function main() {
@@ -330,14 +321,14 @@ function onReviceHeartbeat() {
   console.log("\u6536\u5230\u5FC3\u8DF3\u6307\u4EE4");
   return createStatusResponse({ run: true });
 }
-function onReviceStart(rssi) {
+async function onReviceStart(rssi) {
   console.log("\u6536\u5230\u542F\u52A8\u626B\u63CF\u6307\u4EE4");
-  blueDevice?.startScan(rssi);
+  await blueDevice?.startScan(rssi);
   return createStatusResponse({ msg: "Scan started" });
 }
-function onReviceStop() {
+async function onReviceStop() {
   console.log("\u6536\u5230\u505C\u6B62\u626B\u63CF\u6307\u4EE4");
-  blueDevice?.stopScan();
+  await blueDevice?.stopScan();
   return createStatusResponse({ msg: "Scan stopped" });
 }
 process.on("SIGINT", () => {

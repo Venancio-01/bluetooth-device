@@ -18,28 +18,34 @@ let transport: ITransport | null = null
  * @param message JSON 字符串消息
  * @param cb      响应回调
  */
-function handleMessage(message: string, cb: ResponseCallback) {
-  const request = parseJSONMessage(message)
+async function handleMessage(message: any, cb: ResponseCallback) {
+  const request = message
   if (!request) {
     const errorResponse = createErrorResponse({ msg: 'Invalid message format' })
     return cb(errorResponse)
   }
 
-  switch (request.c) {
-    case CommandCode.HEARTBEAT:
-      console.log('收到心跳指令')
-      return cb(onReviceHeartbeat())
+  try {
+    switch (request.c) {
+      case CommandCode.HEARTBEAT:
+        console.log('收到心跳指令')
+        return cb(onReviceHeartbeat())
 
-    case CommandCode.START:
-      console.log('收到启动扫描指令')
-      return cb(onReviceStart(request.d?.['rssi'] as number | undefined || 60))
+      case CommandCode.START:
+        console.log('收到启动扫描指令')
+        return cb(await onReviceStart(request.d?.['rssi'] as number | undefined || 60))
 
-    case CommandCode.STOP:
-      console.log('收到停止扫描指令')
-      return cb(onReviceStop())
+      case CommandCode.STOP:
+        console.log('收到停止扫描指令')
+        return cb(await onReviceStop())
 
-    default:
-      return cb(createErrorResponse({ msg: 'Unknown command' }))
+      default:
+        return cb(createErrorResponse({ msg: 'Unknown command' }))
+    }
+  }
+  catch (error: any) {
+    console.error('处理指令时发生错误:', error)
+    return cb(createErrorResponse({ msg: error.message || 'Failed to execute command' }))
   }
 }
 
@@ -94,9 +100,9 @@ function onReviceHeartbeat() {
  * @param message 启动扫描指令
  * @returns 启动扫描响应
  */
-function onReviceStart(rssi: number) {
+async function onReviceStart(rssi: number) {
   console.log('收到启动扫描指令')
-  blueDevice?.startScan(rssi)
+  await blueDevice?.startScan(rssi)
   return createStatusResponse({ msg: 'Scan started' })
 }
 
@@ -104,9 +110,9 @@ function onReviceStart(rssi: number) {
  * 处理停止扫描指令
  * @returns 停止扫描响应
  */
-function onReviceStop() {
+async function onReviceStop() {
   console.log('收到停止扫描指令')
-  blueDevice?.stopScan()
+  await blueDevice?.stopScan()
   return createStatusResponse({ msg: 'Scan stopped' })
 }
 
