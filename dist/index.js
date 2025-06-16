@@ -11,7 +11,7 @@ var AT_COMMAND_PREFIX = "AT";
 var AT_COMMAND_MODE = "+++";
 var AT_RESTART = "RESTART";
 var AT_ROLE = "ROLE=1";
-var AT_OBSERVER = "OBSERVER=1,12,,,-60,4C00";
+var AT_OBSERVER = "OBSERVER=1,4,,,";
 function buildEnterCommandMode() {
   return `${AT_COMMAND_MODE}`;
 }
@@ -21,8 +21,9 @@ function buildRestartCommand() {
 function buildRoleCommand() {
   return `${AT_COMMAND_PREFIX}+${AT_ROLE}${AT_COMMAND_SUFFIX}`;
 }
-function buildObserverCommand() {
-  return `${AT_COMMAND_PREFIX}+${AT_OBSERVER}${AT_COMMAND_SUFFIX}`;
+function buildObserverCommand(rssi = 60) {
+  const defaultRssi = `-${rssi}`;
+  return `${AT_COMMAND_PREFIX}+${AT_OBSERVER}${defaultRssi}${AT_COMMAND_SUFFIX}`;
 }
 
 // src/utils.ts
@@ -32,14 +33,18 @@ function sleep(ms) {
 
 // src/blue-device.ts
 var MANUFACTURER_DICT = {
-  "004C": "Apple, Inc.",
-  "0075": "Samsung Electronics Co. Ltd.",
-  "02DE": "Samsung SDS Co., Ltd.",
+  "0001": "Nokia Mobile Phones",
+  // '0006': 'Microsoft',
   "0008": "Motorola",
-  "003C": "BlackBerry Limited"
+  "004C": "Apple, Inc.",
+  "0056": "Sony Ericsson Mobile Communications",
+  "0075": "Samsung Electronics Co. Ltd.",
+  "00C4": "LG Electronics",
+  "00EO": "Google"
 };
 var BlueDevice = class {
   port = null;
+  isInitialized = false;
   constructor() {
     this.port = null;
   }
@@ -100,11 +105,20 @@ var BlueDevice = class {
     await sleep(sleepTime);
   }
   async initialize() {
+    if (this.isInitialized) {
+      return;
+    }
     await this.sendAndSleep(buildRestartCommand(), 1e3);
     await this.sendAndSleep(buildEnterCommandMode(), 1e3);
     await this.sendAndSleep(buildRoleCommand(), 1e3);
     await this.sendAndSleep(buildRestartCommand(), 3e3);
     await this.sendAndSleep(buildEnterCommandMode(), 2e3);
+    this.isInitialized = true;
+  }
+  async scan() {
+    if (!this.isInitialized) {
+      await this.initialize();
+    }
     await this.sendAndSleep(buildObserverCommand(), 0);
   }
 };
@@ -122,6 +136,12 @@ async function main() {
   try {
     await blueDevice.initialize();
     console.log("\u84DD\u7259\u6A21\u5757\u521D\u59CB\u5316\u5B8C\u6210");
+  } catch (error) {
+    console.error(error);
+  }
+  try {
+    await blueDevice.scan();
+    console.log("\u542F\u52A8\u626B\u63CF");
   } catch (error) {
     console.error(error);
   }

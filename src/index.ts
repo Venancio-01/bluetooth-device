@@ -21,6 +21,14 @@ async function main() {
   catch (error) {
     console.error(error)
   }
+
+  try {
+    await blueDevice.scan()
+    console.log('启动扫描')
+  }
+  catch (error) {
+    console.error(error)
+  }
 }
 
 process.on('SIGINT', () => {

@@ -5,15 +5,19 @@ import { sleep } from './utils'
 
 // 厂商字典
 const MANUFACTURER_DICT = {
-  '004C': 'Apple, Inc.',
-  '0075': 'Samsung Electronics Co. Ltd.',
-  '02DE': 'Samsung SDS Co., Ltd.',
+  '0001': 'Nokia Mobile Phones',
+  // '0006': 'Microsoft',
   '0008': 'Motorola',
-  '003C': 'BlackBerry Limited',
+  '004C': 'Apple, Inc.',
+  '0056': 'Sony Ericsson Mobile Communications',
+  '0075': 'Samsung Electronics Co. Ltd.',
+  '00C4': 'LG Electronics',
+  '00EO': 'Google',
 } as const
 
 export class BlueDevice {
   private port: SerialPort | null = null
+  private isInitialized = false
 
   constructor() {
     this.port = null
@@ -90,6 +94,10 @@ export class BlueDevice {
   }
 
   async initialize() {
+    if (this.isInitialized) {
+      return
+    }
+
     // 重启设备
     await this.sendAndSleep(buildRestartCommand(), 1000)
 
@@ -104,6 +112,14 @@ export class BlueDevice {
 
     // 进入AT命令模式
     await this.sendAndSleep(buildEnterCommandMode(), 2000)
+
+    this.isInitialized = true
+  }
+
+  async scan() {
+    if (!this.isInitialized) {
+      await this.initialize()
+    }
 
     // 设置设备为观察者模式
     await this.sendAndSleep(buildObserverCommand(), 0)
