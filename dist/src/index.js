@@ -110,7 +110,6 @@ var BlueDevice = class extends EventEmitter {
       const manufacturer = MANUFACTURER_DICT[targetStr];
       if (manufacturer) {
         const hasDevice = this.deleteDeviceList.has(targetStr);
-        console.log("hasDevice", hasDevice);
         if (!hasDevice) {
           console.log("manufacturer", manufacturer);
           this.emit("device", { mf: manufacturer });
@@ -149,6 +148,7 @@ var BlueDevice = class extends EventEmitter {
       console.log("\u8BBE\u5907\u521D\u59CB\u5316\u4E2D\uFF0C\u8BF7\u7A0D\u540E\u518D\u8BD5");
       return;
     }
+    this.deleteDeviceList.clear();
     this.isScanning = true;
     await this.sendAndSleep(buildObserverCommand(rssi));
   }
@@ -158,7 +158,6 @@ var BlueDevice = class extends EventEmitter {
     }
     await this.sendAndSleep(buildStopObserverCommand());
     this.isScanning = false;
-    this.deleteDeviceList.clear();
   }
   /**
    * 重启设备

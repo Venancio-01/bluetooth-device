@@ -94,7 +94,6 @@ export class BlueDevice extends EventEmitter {
       const manufacturer = MANUFACTURER_DICT[targetStr as keyof typeof MANUFACTURER_DICT]
       if (manufacturer) {
         const hasDevice = this.deleteDeviceList.has(targetStr)
-        console.log('hasDevice', hasDevice)
 
         if (!hasDevice) {
           console.log('manufacturer', manufacturer)
@@ -150,6 +149,8 @@ export class BlueDevice extends EventEmitter {
       console.log('设备初始化中，请稍后再试')
       return
     }
+
+    this.deleteDeviceList.clear()
     this.isScanning = true
     // 设置设备为观察者模式
     await this.sendAndSleep(buildObserverCommand(rssi))
@@ -163,7 +164,6 @@ export class BlueDevice extends EventEmitter {
     // 停止扫描
     await this.sendAndSleep(buildStopObserverCommand())
     this.isScanning = false
-    this.deleteDeviceList.clear()
   }
 
   /**
