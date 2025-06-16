@@ -53,7 +53,8 @@ export class BlueDevice {
       })
 
       parser.on('data', (data) => {
-        console.log(data)
+        console.log('接收数据:', data)
+        this.parseData(data)
       })
 
       this.port.open()
@@ -85,7 +86,7 @@ export class BlueDevice {
     if (splitStr === 'FF') {
       const targetStr = advStr.substring(18, 20) + advStr.substring(16, 18)
       const manufacturer = MANUFACTURER_DICT[targetStr as keyof typeof MANUFACTURER_DICT]
-      console.log(manufacturer)
+      console.log('manufacturer', manufacturer)
     }
   }
 

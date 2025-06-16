@@ -42,8 +42,6 @@
       { "type": "error", "data": { "message": "Failed to start" } }
       ```
 
-
-
 ### 2.2 停止命令
 
 *   **功能**: 停止扫描。

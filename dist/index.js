@@ -73,7 +73,8 @@ var BlueDevice = class {
         reject(new Error("\u4E32\u53E3\u5173\u95ED"));
       });
       parser.on("data", (data) => {
-        console.log(data);
+        console.log("\u63A5\u6536\u6570\u636E:", data);
+        this.parseData(data);
       });
       this.port.open();
     });
@@ -98,7 +99,7 @@ var BlueDevice = class {
     if (splitStr === "FF") {
       const targetStr = advStr.substring(18, 20) + advStr.substring(16, 18);
       const manufacturer = MANUFACTURER_DICT[targetStr];
-      console.log(manufacturer);
+      console.log("manufacturer", manufacturer);
     }
   }
   async sendAndSleep(data, sleepTime) {
