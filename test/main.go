@@ -142,7 +142,7 @@ var listenCmd = &cobra.Command{
 
 func init() {
 	// 在这里定义全局的flag
-	rootCmd.PersistentFlags().StringVarP(&host, "host", "h", "127.0.0.1", "服务器的主机名或IP地址")
+	rootCmd.PersistentFlags().StringVarP(&host, "host", "H", "127.0.0.1", "服务器的主机名或IP地址")
 
 	// 为start命令添加特定的flag
 	startCmd.Flags().IntVar(&rssi, "rssi", 0, "信号强度 (RSSI) 阈值，只扫描此值以上的设备")
