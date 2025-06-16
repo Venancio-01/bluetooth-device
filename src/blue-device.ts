@@ -20,6 +20,7 @@ export class BlueDevice extends EventEmitter {
   private port: SerialPort | null = null
   private initializeState: 'uninitialized' | 'initializing' | 'initialized' = 'uninitialized'
   private isScanning = false
+  private deleteDeviceList: Set<string> = new Set()
 
   constructor() {
     super()
@@ -92,8 +93,13 @@ export class BlueDevice extends EventEmitter {
       const targetStr = advStr.substring(splitStrIndex + 4, splitStrIndex + 6) + advStr.substring(splitStrIndex + 2, splitStrIndex + 4)
       const manufacturer = MANUFACTURER_DICT[targetStr as keyof typeof MANUFACTURER_DICT]
       if (manufacturer) {
-        console.log('manufacturer', manufacturer)
-        this.emit('device', { mf: manufacturer })
+        const hasDevice = this.deleteDeviceList.has(targetStr)
+
+        if (!hasDevice) {
+          console.log('manufacturer', manufacturer)
+          this.emit('device', { mf: manufacturer })
+          this.deleteDeviceList.add(targetStr)
+        }
       }
     }
   }
@@ -156,6 +162,7 @@ export class BlueDevice extends EventEmitter {
     // 停止扫描
     await this.sendAndSleep(buildStopObserverCommand())
     this.isScanning = false
+    this.deleteDeviceList.clear()
   }
 
   /**

@@ -50,6 +50,7 @@ var BlueDevice = class extends EventEmitter {
   port = null;
   initializeState = "uninitialized";
   isScanning = false;
+  deleteDeviceList = /* @__PURE__ */ new Set();
   constructor() {
     super();
     this.port = null;
@@ -108,8 +109,12 @@ var BlueDevice = class extends EventEmitter {
       const targetStr = advStr.substring(splitStrIndex + 4, splitStrIndex + 6) + advStr.substring(splitStrIndex + 2, splitStrIndex + 4);
       const manufacturer = MANUFACTURER_DICT[targetStr];
       if (manufacturer) {
-        console.log("manufacturer", manufacturer);
-        this.emit("device", { mf: manufacturer });
+        const hasDevice = this.deleteDeviceList.has(targetStr);
+        if (!hasDevice) {
+          console.log("manufacturer", manufacturer);
+          this.emit("device", { mf: manufacturer });
+          this.deleteDeviceList.add(targetStr);
+        }
       }
     }
   }
@@ -152,6 +157,7 @@ var BlueDevice = class extends EventEmitter {
     }
     await this.sendAndSleep(buildStopObserverCommand());
     this.isScanning = false;
+    this.deleteDeviceList.clear();
   }
   /**
    * 重启设备
