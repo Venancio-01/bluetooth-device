@@ -8,7 +8,7 @@ export class HttpTransport extends EventEmitter implements ITransport {
   private sseClients: ServerResponse[] = []
   private readonly port: number
 
-  constructor(port = 3000) {
+  constructor(port = 8888) {
     super()
     this.port = port
   }

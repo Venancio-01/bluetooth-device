@@ -6,7 +6,7 @@ import axios from "axios";
 import { EventSource } from "eventsource";
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
-var BASE_URL = "http://localhost:3000";
+var BASE_URL = "http://localhost:8888";
 var CommandCode = {
   START: 1,
   HEARTBEAT: 2,

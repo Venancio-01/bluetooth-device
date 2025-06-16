@@ -209,7 +209,7 @@ var HttpTransport = class extends EventEmitter2 {
   server = null;
   sseClients = [];
   port;
-  constructor(port = 3e3) {
+  constructor(port = 8888) {
     super();
     this.port = port;
   }
