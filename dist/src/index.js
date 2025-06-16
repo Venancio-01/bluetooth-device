@@ -13,6 +13,7 @@ var AT_COMMAND_MODE = "+++";
 var AT_RESTART = "RESTART";
 var AT_ROLE = "ROLE=1";
 var AT_START_OBSERVER = "OBSERVER=1,4,,,";
+var AT_STOP_OBSERVER = "OBSERVER=0";
 function buildEnterCommandMode() {
   return `${AT_COMMAND_MODE}`;
 }
@@ -24,6 +25,9 @@ function buildRoleCommand() {
 }
 function buildObserverCommand(rssi = "-60") {
   return `${AT_COMMAND_PREFIX}+${AT_START_OBSERVER}${rssi}${AT_COMMAND_SUFFIX}`;
+}
+function buildStopObserverCommand() {
+  return `${AT_COMMAND_PREFIX}+${AT_STOP_OBSERVER}${AT_COMMAND_SUFFIX}`;
 }
 
 // src/utils.ts
@@ -108,7 +112,12 @@ var BlueDevice = class extends EventEmitter {
       }
     }
   }
-  async sendAndSleep(data, sleepTime) {
+  /**
+   * 发送数据并等待
+   * @param data 数据
+   * @param sleepTime 等待时间
+   */
+  async sendAndSleep(data, sleepTime = 0) {
     await this.send(data);
     await sleep(sleepTime);
     this.initializeState = "initialized";
@@ -134,13 +143,14 @@ var BlueDevice = class extends EventEmitter {
       return;
     }
     this.isScanning = true;
-    await this.sendAndSleep(buildObserverCommand(rssi), 0);
+    await this.sendAndSleep(buildObserverCommand(rssi));
   }
   async stopScan() {
     if (!this.isScanning) {
+      console.log("\u672A\u5F00\u542F\u626B\u63CF");
       return;
     }
-    await this.sendAndSleep(buildRestartCommand(), 1e3);
+    await this.sendAndSleep(buildStopObserverCommand());
     this.isScanning = false;
   }
 };

@@ -1,7 +1,7 @@
 import { EventEmitter } from 'events'
 import { ReadlineParser } from '@serialport/parser-readline'
 import { SerialPort } from 'serialport'
-import { buildEnterCommandMode, buildObserverCommand, buildRestartCommand, buildRoleCommand } from './protocol'
+import { buildEnterCommandMode, buildObserverCommand, buildRestartCommand, buildRoleCommand, buildStopObserverCommand } from './protocol'
 import { sleep } from './utils'
 
 // 厂商字典
@@ -97,7 +97,12 @@ export class BlueDevice extends EventEmitter {
     }
   }
 
-  async sendAndSleep(data: string, sleepTime: number) {
+  /**
+   * 发送数据并等待
+   * @param data 数据
+   * @param sleepTime 等待时间
+   */
+  async sendAndSleep(data: string, sleepTime = 0) {
     await this.send(data)
     await sleep(sleepTime)
     this.initializeState = 'initialized'
@@ -139,15 +144,17 @@ export class BlueDevice extends EventEmitter {
     }
     this.isScanning = true
     // 设置设备为观察者模式
-    await this.sendAndSleep(buildObserverCommand(rssi), 0)
+    await this.sendAndSleep(buildObserverCommand(rssi))
   }
 
   async stopScan() {
     if (!this.isScanning) {
+      console.log('未开启扫描')
       return
     }
-    // 通过重启设备来停止扫描
-    await this.sendAndSleep(buildRestartCommand(), 1000)
+
+    // 停止扫描
+    await this.sendAndSleep(buildStopObserverCommand())
     this.isScanning = false
   }
 }
