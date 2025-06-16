@@ -248,10 +248,16 @@ var HttpTransport = class extends EventEmitter2 {
   };
   setupRoutes = () => {
     this.app.post("/command", express.json(), (req, res) => {
-      const cb = (response) => {
-        res.status(200).send(response);
-      };
-      this.emit("data", req.body, cb);
+      console.log("Received command with body:", req.body);
+      try {
+        const cb = (response) => {
+          res.status(200).send(response);
+        };
+        this.emit("data", req.body, cb);
+      } catch (error) {
+        console.error("!!! Critical error in event handler !!!", error);
+        res.status(500).send({ error: "Internal Server Error", message: error.message });
+      }
     });
     this.app.get("/events", this.setupSse);
   };
