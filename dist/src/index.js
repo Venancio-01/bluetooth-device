@@ -246,6 +246,14 @@ var HttpTransport = class extends EventEmitter2 {
       }
     });
     this.app.get("/events", this.setupSse);
+    this.app.all("*", (req, res) => {
+      console.log(`[Test] Received unhandled request: ${req.method} ${req.path}`);
+      res.status(200).json({
+        message: "This is a catch-all test response.",
+        method: req.method,
+        path: req.path
+      });
+    });
   };
   setupSse = (req, res) => {
     res.writeHead(200, {
