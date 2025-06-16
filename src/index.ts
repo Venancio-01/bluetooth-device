@@ -28,15 +28,12 @@ async function handleMessage(message: any, cb: ResponseCallback) {
   try {
     switch (request.c) {
       case CommandCode.HEARTBEAT:
-        console.log('收到心跳指令')
         return cb(onReviceHeartbeat())
 
       case CommandCode.START:
-        console.log('收到启动扫描指令')
         return cb(await onReviceStart(request.d?.['rssi'] as number | undefined || 60))
 
       case CommandCode.STOP:
-        console.log('收到停止扫描指令')
         return cb(await onReviceStop())
 
       default:

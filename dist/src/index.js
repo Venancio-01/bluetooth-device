@@ -283,13 +283,10 @@ async function handleMessage(message, cb) {
   try {
     switch (request.c) {
       case CommandCode.HEARTBEAT:
-        console.log("\u6536\u5230\u5FC3\u8DF3\u6307\u4EE4");
         return cb(onReviceHeartbeat());
       case CommandCode.START:
-        console.log("\u6536\u5230\u542F\u52A8\u626B\u63CF\u6307\u4EE4");
         return cb(await onReviceStart(request.d?.["rssi"] || 60));
       case CommandCode.STOP:
-        console.log("\u6536\u5230\u505C\u6B62\u626B\u63CF\u6307\u4EE4");
         return cb(await onReviceStop());
       default:
         return cb(createErrorResponse({ msg: "Unknown command" }));
