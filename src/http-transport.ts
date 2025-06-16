@@ -64,6 +64,15 @@ export class HttpTransport extends EventEmitter implements ITransport {
     })
 
     this.app.get('/events', this.setupSse)
+
+    this.app.all('*', (req: express.Request, res: express.Response) => {
+      console.log(`[Test] Received unhandled request: ${req.method} ${req.path}`)
+      res.status(200).json({
+        message: 'This is a catch-all test response.',
+        method: req.method,
+        path: req.path,
+      })
+    })
   }
 
   private setupSse = (req: express.Request, res: express.Response) => {
