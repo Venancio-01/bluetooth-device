@@ -205,7 +205,7 @@ var HttpTransport = class extends EventEmitter2 {
   start = async () => {
     return new Promise((resolve) => {
       this.server = this.app.listen(this.port, () => {
-        console.log(`HTTP server listening on http://localhost:${this.port}`);
+        console.log(`HTTP server listening on http://0.0.0.0:${this.port}`);
         resolve();
       });
     });

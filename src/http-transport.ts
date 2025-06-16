@@ -19,7 +19,7 @@ export class HttpTransport extends EventEmitter implements ITransport {
   start = async () => {
     return new Promise<void>((resolve) => {
       this.server = this.app.listen(this.port, () => {
-        console.log(`HTTP server listening on http://localhost:${this.port}`)
+        console.log(`HTTP server listening on http://0.0.0.0:${this.port}`)
         resolve()
       })
     })

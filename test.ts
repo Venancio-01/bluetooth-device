@@ -7,7 +7,7 @@ import { EventSource } from 'eventsource'
 import yargs from 'yargs'
 import { hideBin } from 'yargs/helpers'
 
-const BASE_URL = 'http://localhost:8888'
+const BASE_URL = 'http://0.0.0.0:8888'
 
 // 命令码 (与 src/communication.ts 一致)
 const CommandCode = {
