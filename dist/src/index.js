@@ -11,7 +11,7 @@ var AT_COMMAND_SUFFIX = "\r\n";
 var AT_COMMAND_PREFIX = "AT";
 var AT_COMMAND_MODE = "+++";
 var AT_RESTART = "RESTART";
-var AT_ROLE = "ROLE=1";
+var AT_SET_ROLE = "ROLE=1";
 var AT_START_OBSERVER = "OBSERVER=1,4,,,";
 var AT_STOP_OBSERVER = "OBSERVER=0";
 function buildEnterCommandMode() {
@@ -20,8 +20,8 @@ function buildEnterCommandMode() {
 function buildRestartCommand() {
   return `${AT_COMMAND_PREFIX}+${AT_RESTART}${AT_COMMAND_SUFFIX}`;
 }
-function buildRoleCommand() {
-  return `${AT_COMMAND_PREFIX}+${AT_ROLE}${AT_COMMAND_SUFFIX}`;
+function buildSetRoleCommand() {
+  return `${AT_COMMAND_PREFIX}+${AT_SET_ROLE}${AT_COMMAND_SUFFIX}`;
 }
 function buildObserverCommand(rssi = "-60") {
   return `${AT_COMMAND_PREFIX}+${AT_START_OBSERVER}${rssi}${AT_COMMAND_SUFFIX}`;
@@ -86,6 +86,7 @@ var BlueDevice = class extends EventEmitter {
     });
   }
   async disconnect() {
+    await this.stopScan();
     this.port?.close();
   }
   async send(data) {
@@ -129,7 +130,7 @@ var BlueDevice = class extends EventEmitter {
     this.initializeState = "initializing";
     await this.sendAndSleep(buildRestartCommand(), 1e3);
     await this.sendAndSleep(buildEnterCommandMode(), 1e3);
-    await this.sendAndSleep(buildRoleCommand(), 1e3);
+    await this.sendAndSleep(buildSetRoleCommand(), 1e3);
     await this.sendAndSleep(buildRestartCommand(), 3e3);
     await this.sendAndSleep(buildEnterCommandMode(), 2e3);
     this.initializeState = "initialized";
@@ -147,11 +148,16 @@ var BlueDevice = class extends EventEmitter {
   }
   async stopScan() {
     if (!this.isScanning) {
-      console.log("\u672A\u5F00\u542F\u626B\u63CF");
       return;
     }
     await this.sendAndSleep(buildStopObserverCommand());
     this.isScanning = false;
+  }
+  /**
+   * 重启设备
+   */
+  async restart() {
+    await this.sendAndSleep(buildRestartCommand());
   }
 };
 

@@ -1,7 +1,7 @@
 import { EventEmitter } from 'events'
 import { ReadlineParser } from '@serialport/parser-readline'
 import { SerialPort } from 'serialport'
-import { buildEnterCommandMode, buildObserverCommand, buildRestartCommand, buildRoleCommand, buildStopObserverCommand } from './protocol'
+import { buildEnterCommandMode, buildObserverCommand, buildRestartCommand, buildSetRoleCommand, buildStopObserverCommand } from './protocol'
 import { sleep } from './utils'
 
 // 厂商字典
@@ -65,6 +65,7 @@ export class BlueDevice extends EventEmitter {
   }
 
   async disconnect() {
+    await this.stopScan()
     this.port?.close()
   }
 
@@ -121,8 +122,8 @@ export class BlueDevice extends EventEmitter {
     // 进入AT命令模式
     await this.sendAndSleep(buildEnterCommandMode(), 1000)
 
-    // 设置设备为从机模式
-    await this.sendAndSleep(buildRoleCommand(), 1000)
+    // 设置设备为单主角色
+    await this.sendAndSleep(buildSetRoleCommand(), 1000)
 
     // 重启设备
     await this.sendAndSleep(buildRestartCommand(), 3000)
@@ -149,12 +150,18 @@ export class BlueDevice extends EventEmitter {
 
   async stopScan() {
     if (!this.isScanning) {
-      console.log('未开启扫描')
       return
     }
 
     // 停止扫描
     await this.sendAndSleep(buildStopObserverCommand())
     this.isScanning = false
+  }
+
+  /**
+   * 重启设备
+   */
+  async restart() {
+    await this.sendAndSleep(buildRestartCommand())
   }
 }

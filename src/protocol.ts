@@ -3,7 +3,8 @@ const AT_COMMAND_PREFIX = 'AT' // 所有 AT 命令都必须以 AT 开头
 const AT_COMMAND_MODE = '+++' // 进入AT命令模式,无需回车换行符
 
 const AT_RESTART = 'RESTART'
-const AT_ROLE = 'ROLE=1'
+const AT_SET_ROLE = 'ROLE=1'
+const AT_GET_ROLE = 'ROLE?'
 const AT_START_OBSERVER = 'OBSERVER=1,4,,,'
 const AT_STOP_OBSERVER = 'OBSERVER=0'
 
@@ -22,10 +23,24 @@ export function buildRestartCommand() {
 }
 
 /**
- * 设置设备为从机模式
+ * 设置设备为单主角色
  */
-export function buildRoleCommand() {
-  return `${AT_COMMAND_PREFIX}+${AT_ROLE}${AT_COMMAND_SUFFIX}`
+export function buildSetRoleCommand() {
+  return `${AT_COMMAND_PREFIX}+${AT_SET_ROLE}${AT_COMMAND_SUFFIX}`
+}
+
+/**
+ * 获取设备角色
+ */
+export function buildQueryRoleCommand() {
+  return `${AT_COMMAND_PREFIX}+${AT_GET_ROLE}${AT_COMMAND_SUFFIX}`
+}
+
+/**
+ * 获取设备角色
+ */
+export function parseQueryRoleCommand(data: string) {
+  return data.split('=')[1]
 }
 
 /**
