@@ -22,9 +22,8 @@ function buildRestartCommand() {
 function buildRoleCommand() {
   return `${AT_COMMAND_PREFIX}+${AT_ROLE}${AT_COMMAND_SUFFIX}`;
 }
-function buildObserverCommand(rssi = 60) {
-  const defaultRssi = `-${rssi}`;
-  return `${AT_COMMAND_PREFIX}+${AT_START_OBSERVER}${defaultRssi}${AT_COMMAND_SUFFIX}`;
+function buildObserverCommand(rssi = "-60") {
+  return `${AT_COMMAND_PREFIX}+${AT_START_OBSERVER}${rssi}${AT_COMMAND_SUFFIX}`;
 }
 
 // src/utils.ts
@@ -126,7 +125,7 @@ var BlueDevice = class extends EventEmitter {
     await this.sendAndSleep(buildEnterCommandMode(), 2e3);
     this.initializeState = "initialized";
   }
-  async startScan(rssi = 60) {
+  async startScan(rssi = "-60") {
     if (this.initializeState === "uninitialized") {
       await this.initialize();
     }
@@ -234,26 +233,16 @@ var HttpTransport = class extends EventEmitter2 {
   };
   setupRoutes = () => {
     this.app.post("/command", express.json(), (req, res) => {
-      console.log("Received command with body:", req.body);
       try {
         const cb = (response) => {
           res.status(200).send(response);
         };
         this.emit("data", req.body, cb);
       } catch (error) {
-        console.error("!!! Critical error in event handler !!!", error);
         res.status(500).send({ error: "Internal Server Error", message: error.message });
       }
     });
     this.app.get("/events", this.setupSse);
-    this.app.all(/(.*)/, (req, res) => {
-      console.log(`[Test] Received unhandled request: ${req.method} ${req.path}`);
-      res.status(200).json({
-        message: "This is a catch-all test response.",
-        method: req.method,
-        path: req.path
-      });
-    });
   };
   setupSse = (req, res) => {
     res.writeHead(200, {
@@ -285,7 +274,7 @@ async function handleMessage(message, cb) {
       case CommandCode.HEARTBEAT:
         return cb(onReviceHeartbeat());
       case CommandCode.START:
-        return cb(await onReviceStart(request.d?.["rssi"] || 60));
+        return cb(await onReviceStart(request.d?.["rssi"] || "-60"));
       case CommandCode.STOP:
         return cb(await onReviceStop());
       default:
@@ -326,8 +315,8 @@ function onReviceHeartbeat() {
   console.log("\u6536\u5230\u5FC3\u8DF3\u6307\u4EE4");
   return createStatusResponse({ run: true });
 }
-async function onReviceStart(rssi) {
-  console.log("\u6536\u5230\u542F\u52A8\u626B\u63CF\u6307\u4EE4");
+async function onReviceStart(rssi = "-60") {
+  console.log("\u6536\u5230\u542F\u52A8\u626B\u63CF\u6307\u4EE4", rssi);
   await blueDevice?.startScan(rssi);
   return createStatusResponse({ msg: "Scan started" });
 }

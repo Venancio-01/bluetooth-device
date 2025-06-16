@@ -51,11 +51,20 @@ yargs(hideBin(process.argv)).scriptName("test-client").command(
 ).command(
   "start",
   "Send start scan command",
-  () => {
+  (yargs2) => {
+    return yargs2.option("rssi", {
+      describe: "\u4FE1\u53F7\u5F3A\u5EA6 (RSSI) \u9608\u503C\uFF0C\u53EA\u626B\u63CF\u6B64\u503C\u4EE5\u4E0A\u7684\u8BBE\u5907",
+      type: "number"
+    });
   },
-  async () => {
+  async (argv) => {
     console.log("Sending [start] command...");
-    await sendCommand(CommandCode.START);
+    const data = {};
+    if (argv.rssi !== void 0) {
+      data.rssi = argv.rssi;
+      console.log(`  - \u4F7F\u7528 RSSI \u9608\u503C: >= ${argv.rssi}`);
+    }
+    await sendCommand(CommandCode.START, data);
   }
 ).command(
   "stop",

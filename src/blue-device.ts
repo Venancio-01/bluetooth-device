@@ -128,7 +128,7 @@ export class BlueDevice extends EventEmitter {
     this.initializeState = 'initialized'
   }
 
-  async startScan(rssi = 60) {
+  async startScan(rssi = '-60') {
     if (this.initializeState === 'uninitialized') {
       await this.initialize()
     }

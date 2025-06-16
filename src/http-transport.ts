@@ -50,7 +50,6 @@ export class HttpTransport extends EventEmitter implements ITransport {
 
   private setupRoutes = () => {
     this.app.post('/command', express.json(), (req: express.Request, res: express.Response) => {
-      console.log('Received command with body:', req.body)
       try {
         const cb: ResponseCallback = (response) => {
           res.status(200).send(response)
@@ -58,21 +57,11 @@ export class HttpTransport extends EventEmitter implements ITransport {
         this.emit('data', req.body, cb)
       }
       catch (error: any) {
-        console.error('!!! Critical error in event handler !!!', error)
         res.status(500).send({ error: 'Internal Server Error', message: error.message })
       }
     })
 
     this.app.get('/events', this.setupSse)
-
-    this.app.all(/(.*)/, (req: express.Request, res: express.Response) => {
-      console.log(`[Test] Received unhandled request: ${req.method} ${req.path}`)
-      res.status(200).json({
-        message: 'This is a catch-all test response.',
-        method: req.method,
-        path: req.path,
-      })
-    })
   }
 
   private setupSse = (req: express.Request, res: express.Response) => {

@@ -66,10 +66,20 @@ yargs(hideBin(process.argv))
   .command(
     'start',
     'Send start scan command',
-    () => {},
-    async () => {
+    (yargs) => {
+      return yargs.option('rssi', {
+        describe: '信号强度 (RSSI) 阈值，只扫描此值以上的设备',
+        type: 'number',
+      })
+    },
+    async (argv) => {
       console.log('Sending [start] command...')
-      await sendCommand(CommandCode.START)
+      const data: { rssi?: number } = {}
+      if (argv.rssi !== undefined) {
+        data.rssi = argv.rssi
+        console.log(`  - 使用 RSSI 阈值: >= ${argv.rssi}`)
+      }
+      await sendCommand(CommandCode.START, data)
     },
   )
   .command(

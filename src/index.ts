@@ -6,7 +6,6 @@ import {
   createDeviceEvent,
   createErrorResponse,
   createStatusResponse,
-  parseJSONMessage,
 } from './communication'
 import { HttpTransport } from './http-transport'
 
@@ -31,7 +30,7 @@ async function handleMessage(message: any, cb: ResponseCallback) {
         return cb(onReviceHeartbeat())
 
       case CommandCode.START:
-        return cb(await onReviceStart(request.d?.['rssi'] as number | undefined || 60))
+        return cb(await onReviceStart(request.d?.['rssi'] as string | undefined || '-60'))
 
       case CommandCode.STOP:
         return cb(await onReviceStop())
@@ -97,8 +96,8 @@ function onReviceHeartbeat() {
  * @param message 启动扫描指令
  * @returns 启动扫描响应
  */
-async function onReviceStart(rssi: number) {
-  console.log('收到启动扫描指令')
+async function onReviceStart(rssi = '-60') {
+  console.log('收到启动扫描指令', rssi)
   await blueDevice?.startScan(rssi)
   return createStatusResponse({ msg: 'Scan started' })
 }

@@ -31,9 +31,8 @@ export function buildRoleCommand() {
 /**
  * 设置设备为观察者模式
  */
-export function buildObserverCommand(rssi = 60) {
-  const defaultRssi = `-${rssi}`
-  return `${AT_COMMAND_PREFIX}+${AT_START_OBSERVER}${defaultRssi}${AT_COMMAND_SUFFIX}`
+export function buildObserverCommand(rssi = '-60') {
+  return `${AT_COMMAND_PREFIX}+${AT_START_OBSERVER}${rssi}${AT_COMMAND_SUFFIX}`
 }
 
 /**
