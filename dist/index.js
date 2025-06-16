@@ -292,7 +292,7 @@ function handleMessage(message, cb) {
   switch (request.c) {
     case CommandCode.HEARTBEAT:
       console.log("\u6536\u5230\u5FC3\u8DF3\u6307\u4EE4");
-      return cb(createStatusResponse({ run: true, pt: "/dev/ttyUSB0" }));
+      return cb(createStatusResponse({ run: true }));
     case CommandCode.START:
       console.log("\u6536\u5230\u542F\u52A8\u626B\u63CF\u6307\u4EE4");
       blueDevice?.startScan();

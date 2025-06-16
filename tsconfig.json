@@ -12,7 +12,7 @@
     "experimentalDecorators": true,
     // 模块系统配置
     "module": "ESNext",
-    "moduleResolution": "bundler",
+    "moduleResolution": "node",
     "resolveJsonModule": true,
     "allowImportingTsExtensions": true,
     // 类型检查

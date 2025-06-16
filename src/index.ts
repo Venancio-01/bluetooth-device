@@ -28,8 +28,7 @@ function handleMessage(message: string, cb: ResponseCallback) {
   switch (request.c) {
     case CommandCode.HEARTBEAT:
       console.log('收到心跳指令')
-      // TODO: 应该从实际的 blueDevice 实例中获取状态
-      return cb(createStatusResponse({ run: true, pt: '/dev/ttyUSB0' }))
+      return cb(createStatusResponse({ run: true }))
 
     case CommandCode.START:
       console.log('收到启动扫描指令')
