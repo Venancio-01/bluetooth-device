@@ -1,4 +1,6 @@
 #!/usr/bin/env ts-node
+import type { AxiosError } from 'axios'
+import type { ErrorEvent } from 'eventsource'
 import process from 'process'
 import axios from 'axios'
 import { EventSource } from 'eventsource'
@@ -24,12 +26,28 @@ async function sendCommand(command: number, data = {}) {
     console.log(response.data)
   }
   catch (error: any) {
-    console.error('❌  Error:')
-    if (error.response) {
-      console.error(error.response.data)
+    console.error('❌  请求失败:')
+    if (axios.isAxiosError(error)) {
+      const axiosError = error as AxiosError
+      if (axiosError.response) {
+        // 服务器返回了错误状态码
+        console.error(`  - 状态码: ${axiosError.response.status}`)
+        console.error('  - 响应数据:', axiosError.response.data)
+      }
+      else if (axiosError.request) {
+        // 请求已发出，但没有收到响应
+        console.error('  - 错误: 未收到服务器响应。')
+        console.error('  - 提示: 请确认主程序 (src/index.ts) 是否已在运行，并且监听的地址和端口正确。')
+      }
+      else {
+        // 设置请求时发生错误
+        console.error('  - 错误: 请求设置失败。')
+        console.error('  - 详情:', axiosError.message)
+      }
     }
     else {
-      console.error(error.message)
+      // 其他未知错误
+      console.error('  - 发生未知错误:', error.message || error)
     }
   }
 }
@@ -74,12 +92,12 @@ yargs(hideBin(process.argv))
         console.log('📩  Received event:')
         console.log(JSON.parse(event.data))
       }
-      es.onerror = (err: Event & { status?: number, message?: string }) => {
-        if (err.status === 404) {
-          console.error('❌ Server not found. Is the main application running?')
+      es.onerror = (err: ErrorEvent) => {
+        if (err.type === 'error' && (err as any).status === 404) {
+          console.error('❌ 找不到服务器。主应用程序 (src/index.ts) 是否正在运行？')
         }
         else {
-          console.error('❌ EventSource error:', err.message || err)
+          console.error('❌ EventSource 错误:', err)
         }
         es.close()
       }
