@@ -1140,6 +1140,7 @@ var transport = null;
 var heartbeatTimer = null;
 async function handleMessage(message, cb) {
   const request = message;
+  console.log("request", request);
   if (!request) {
     const errorResponse = createErrorResponse({
       code: ErrorCode.INVALID_MESSAGE_FORMAT,

@@ -27,6 +27,7 @@ let heartbeatTimer: NodeJS.Timeout | null = null
  */
 async function handleMessage(message: any, cb: ResponseCallback) {
   const request = message
+  console.log('request', request)
   if (!request) {
     const errorResponse = createErrorResponse({
       code: ErrorCode.INVALID_MESSAGE_FORMAT,
