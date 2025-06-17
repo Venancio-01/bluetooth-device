@@ -9,18 +9,18 @@ import (
 type CommandCode int
 
 const (
-	START     CommandCode = 1 // 启动扫描
-	HEARTBEAT CommandCode = 2 // 心跳
-	STOP      CommandCode = 3 // 停止扫描
+	START CommandCode = 1 // 启动扫描
+	STOP  CommandCode = 2 // 停止扫描
 )
 
 // 事件/响应码 (设备 -> 上位机)
 type EventTypeCode int
 
 const (
-	STATUS EventTypeCode = 1 // 状态
-	ERROR  EventTypeCode = 2 // 错误
-	DEVICE EventTypeCode = 3 // 扫描到设备
+	STATUS    EventTypeCode = 1 // 状态
+	ERROR     EventTypeCode = 2 // 错误
+	DEVICE    EventTypeCode = 3 // 扫描到设备
+	HEARTBEAT EventTypeCode = 4 // 心跳
 )
 
 // 请求格式 (上位机 -> 设备)
@@ -59,6 +59,16 @@ func CreateErrorResponse(data map[string]interface{}) string {
 func CreateDeviceEvent(data map[string]interface{}) string {
 	response := Response{
 		Type: DEVICE,
+		Data: data,
+	}
+	jsonData, _ := json.Marshal(response)
+	return string(jsonData)
+}
+
+// 创建心跳事件
+func CreateHeartbeatEvent(data map[string]interface{}) string {
+	response := Response{
+		Type: HEARTBEAT,
 		Data: data,
 	}
 	jsonData, _ := json.Marshal(response)

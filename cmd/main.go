@@ -16,17 +16,13 @@ import (
 func handleMessage(blueDevice *bluetooth.BlueDevice, req *communication.Request) string {
 	if req == nil {
 		return communication.CreateErrorResponse(map[string]interface{}{
-			"msg": "Invalid message format",
+			"msg": "Invalid message format", // msg 已经是缩写形式
 		})
 	}
 
 	switch req.Command {
-	case communication.HEARTBEAT:
-		log.Println("收到心跳指令")
-		return onReceiveHeartbeat(blueDevice)
-
 	case communication.START:
-		rssi := "-60" // 默认值
+		rssi := "-50" // 默认值，根据协议文档修改为-50
 		if req.Data != nil {
 			if rssiVal, ok := req.Data["rssi"].(string); ok && rssiVal != "" {
 				rssi = rssiVal
@@ -41,17 +37,12 @@ func handleMessage(blueDevice *bluetooth.BlueDevice, req *communication.Request)
 
 	default:
 		return communication.CreateErrorResponse(map[string]interface{}{
-			"msg": "Unknown command",
+			"msg": "Unknown command", // msg 已经是缩写形式
 		})
 	}
 }
 
-// onReceiveHeartbeat 处理心跳指令
-func onReceiveHeartbeat(blueDevice *bluetooth.BlueDevice) string {
-	return communication.CreateStatusResponse(map[string]interface{}{
-		"run": true,
-	})
-}
+
 
 // onReceiveStart 处理启动扫描指令
 func onReceiveStart(blueDevice *bluetooth.BlueDevice, rssi string) string {
@@ -59,11 +50,11 @@ func onReceiveStart(blueDevice *bluetooth.BlueDevice, rssi string) string {
 	if err != nil {
 		log.Printf("启动扫描失败: %v", err)
 		return communication.CreateErrorResponse(map[string]interface{}{
-			"msg": err.Error(),
+			"msg": err.Error(), // msg 已经是缩写形式
 		})
 	}
 	return communication.CreateStatusResponse(map[string]interface{}{
-		"msg": "Scan started",
+		"msg": "Scan started", // msg 已经是缩写形式
 	})
 }
 
@@ -73,11 +64,11 @@ func onReceiveStop(blueDevice *bluetooth.BlueDevice) string {
 	if err != nil {
 		log.Printf("停止扫描失败: %v", err)
 		return communication.CreateErrorResponse(map[string]interface{}{
-			"msg": err.Error(),
+			"msg": err.Error(), // msg 已经是缩写形式
 		})
 	}
 	return communication.CreateStatusResponse(map[string]interface{}{
-		"msg": "Scan stopped",
+		"msg": "Scan stopped", // msg 已经是缩写形式
 	})
 }
 

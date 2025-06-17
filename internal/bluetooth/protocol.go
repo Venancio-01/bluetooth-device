@@ -48,7 +48,7 @@ func ParseQueryRoleCommand(data string) string {
 // 设置设备为观察者模式
 func BuildObserverCommand(rssi string) string {
 	if rssi == "" {
-		rssi = "-60" // 默认RSSI阈值
+		rssi = "-50" // 默认RSSI阈值，根据协议文档修改为-50
 	}
 	return fmt.Sprintf("%s+%s%s%s", AT_COMMAND_PREFIX, AT_START_OBSERVER, rssi, AT_COMMAND_SUFFIX)
 }

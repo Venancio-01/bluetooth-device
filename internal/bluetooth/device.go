@@ -37,9 +37,11 @@ type BlueDevice struct {
 	port            serial.Port
 	initializeState InitializeState
 	isScanning      bool
-	deviceEvents    chan string    // 用于上报设备事件
+	deviceEvents    chan string     // 用于上报设备事件
 	detectedDevices map[string]bool // 用于去重已检测到的设备
-	mutex           sync.Mutex     // 用于保护共享状态
+	mutex           sync.Mutex      // 用于保护共享状态
+	heartbeatTicker *time.Ticker    // 心跳定时器
+	heartbeatStop   chan bool       // 心跳停止信号
 }
 
 // NewBlueDevice 创建新的蓝牙设备实例
@@ -49,6 +51,7 @@ func NewBlueDevice() *BlueDevice {
 		isScanning:      false,
 		deviceEvents:    make(chan string, 10),
 		detectedDevices: make(map[string]bool),
+		heartbeatStop:   make(chan bool),
 	}
 }
 
@@ -83,6 +86,9 @@ func (bd *BlueDevice) Disconnect() error {
 	if err := bd.stopScanInternal(); err != nil {
 		log.Printf("停止扫描时出错: %v", err)
 	}
+
+	// 停止心跳机制
+	bd.stopHeartbeat()
 
 	if bd.port != nil {
 		err := bd.port.Close()
@@ -148,9 +154,8 @@ func (bd *BlueDevice) parseData(data string) {
 		return
 	}
 
-	// 提取厂商ID（根据源项目逻辑）
+	// 提取厂商ID
 	if ffIndex+6 <= len(advStr) {
-		// targetStr = advStr.substring(splitStrIndex + 4, splitStrIndex + 6) + advStr.substring(splitStrIndex + 2, splitStrIndex + 4)
 		if ffIndex+6 <= len(advStr) {
 			part1 := advStr[ffIndex+4 : ffIndex+6]
 			part2 := advStr[ffIndex+2 : ffIndex+4]
@@ -233,6 +238,10 @@ func (bd *BlueDevice) Initialize() error {
 
 	bd.initializeState = Initialized
 	log.Println("蓝牙设备初始化完成")
+
+	// 启动心跳机制
+	bd.startHeartbeat()
+
 	return nil
 }
 
@@ -307,4 +316,54 @@ func (bd *BlueDevice) GetInitializeState() InitializeState {
 	bd.mutex.Lock()
 	defer bd.mutex.Unlock()
 	return bd.initializeState
+}
+
+// startHeartbeat 启动心跳机制
+func (bd *BlueDevice) startHeartbeat() {
+	bd.mutex.Lock()
+	defer bd.mutex.Unlock()
+
+	if bd.heartbeatTicker != nil {
+		return // 心跳已经启动
+	}
+
+	bd.heartbeatTicker = time.NewTicker(2 * time.Second)
+
+	go func() {
+		for {
+			select {
+			case <-bd.heartbeatTicker.C:
+				// 发送心跳事件，使用缩写键名
+				heartbeatEvent := communication.CreateHeartbeatEvent(map[string]interface{}{
+					"run": true, // run 已经是缩写形式
+				})
+				select {
+				case bd.deviceEvents <- heartbeatEvent:
+					log.Println("发送心跳事件")
+				default:
+					// 如果通道满了，跳过这次心跳
+					log.Println("心跳事件通道满，跳过此次心跳")
+				}
+			case <-bd.heartbeatStop:
+				return
+			}
+		}
+	}()
+}
+
+// stopHeartbeat 停止心跳机制
+func (bd *BlueDevice) stopHeartbeat() {
+	bd.mutex.Lock()
+	defer bd.mutex.Unlock()
+
+	if bd.heartbeatTicker != nil {
+		bd.heartbeatTicker.Stop()
+		bd.heartbeatTicker = nil
+
+		// 发送停止信号
+		select {
+		case bd.heartbeatStop <- true:
+		default:
+		}
+	}
 }

@@ -14,10 +14,10 @@ import (
 )
 
 const (
-	basePort    = 8888
-	cmdStart     = 1
-	cmdHeartbeat = 2
-	cmdStop      = 3
+	basePort = 8888
+	cmdStart = 1 // 启动扫描
+	cmdStop  = 2 // 停止扫描
+	// 心跳已移除，现在是自动事件
 )
 
 // CommandPayload 对应于ts代码中的 {c: command, d: data}
@@ -80,14 +80,7 @@ func sendCommand(cmdCode int, data interface{}) {
 }
 
 // 子命令定义
-var heartbeatCmd = &cobra.Command{
-	Use:   "heartbeat",
-	Short: "Send heartbeat command",
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("Sending [heartbeat] command...")
-		sendCommand(cmdHeartbeat, struct{}{})
-	},
-}
+// 心跳命令已移除，现在心跳是自动事件
 
 var startCmd = &cobra.Command{
 	Use:   "start",
@@ -147,8 +140,8 @@ func init() {
 	// 为start命令添加特定的flag
 	startCmd.Flags().IntVar(&rssi, "rssi", 0, "信号强度 (RSSI) 阈值，只扫描此值以上的设备")
 
-	// 将子命令添加到根命令
-	rootCmd.AddCommand(heartbeatCmd, startCmd, stopCmd, listenCmd)
+	// 将子命令添加到根命令（移除了heartbeatCmd，因为心跳现在是自动事件）
+	rootCmd.AddCommand(startCmd, stopCmd, listenCmd)
 }
 
 func main() {
