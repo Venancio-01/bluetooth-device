@@ -239,28 +239,31 @@ func (bd *BlueDevice) Initialize() error {
 	bd.initializeState = Initialized
 	log.Println("蓝牙设备初始化完成")
 
-	// 启动心跳机制
-	bd.startHeartbeat()
+	// 启动心跳机制（不加锁版本，因为Initialize已经持有锁）
+	bd.startHeartbeatInternal()
 
 	return nil
 }
 
 // StartScan 开始扫描
 func (bd *BlueDevice) StartScan(rssi string) error {
+	// 首先检查是否需要初始化，避免在持有锁时调用Initialize
 	bd.mutex.Lock()
-	defer bd.mutex.Unlock()
+	needInit := bd.initializeState == Uninitialized
+	isInitializing := bd.initializeState == Initializing
+	bd.mutex.Unlock()
 
-	if bd.initializeState == Uninitialized {
-		bd.mutex.Unlock()
+	if needInit {
 		if err := bd.Initialize(); err != nil {
 			return fmt.Errorf("初始化设备失败: %w", err)
 		}
-		bd.mutex.Lock()
-	}
-
-	if bd.initializeState == Initializing {
+	} else if isInitializing {
 		return fmt.Errorf("设备初始化中，请稍后再试")
 	}
+
+	// 现在安全地获取锁进行扫描操作
+	bd.mutex.Lock()
+	defer bd.mutex.Unlock()
 
 	// 清空已检测设备列表
 	bd.detectedDevices = make(map[string]bool)
@@ -318,11 +321,15 @@ func (bd *BlueDevice) GetInitializeState() InitializeState {
 	return bd.initializeState
 }
 
-// startHeartbeat 启动心跳机制
+// startHeartbeat 启动心跳机制（带锁版本）
 func (bd *BlueDevice) startHeartbeat() {
 	bd.mutex.Lock()
 	defer bd.mutex.Unlock()
+	bd.startHeartbeatInternal()
+}
 
+// startHeartbeatInternal 启动心跳机制（内部方法，不加锁）
+func (bd *BlueDevice) startHeartbeatInternal() {
 	if bd.heartbeatTicker != nil {
 		return // 心跳已经启动
 	}

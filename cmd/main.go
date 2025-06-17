@@ -81,9 +81,10 @@ func main() {
 
 	// 连接蓝牙设备
 	if err := blueDevice.Connect(); err != nil {
-		log.Fatalf("连接蓝牙设备失败: %v", err)
+		log.Fatalf("连接蓝牙设备失败: %v", err)	
+	} else {
+		log.Println("蓝牙模块连接成功")
 	}
-	log.Println("蓝牙模块连接成功")
 
 	// 启动HTTP传输层
 	if err := httpTransport.Start(); err != nil {
