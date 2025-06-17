@@ -37,7 +37,7 @@ async function handleMessage(message: any, cb: ResponseCallback) {
         return cb(await onReceiveStart(request.d))
 
       case CommandCode.STOP:
-        return cb(await onReceiveStop(request.d))
+        return cb(await onReceiveStop())
 
       default:
         return cb(createErrorResponse({ msg: 'Unknown command' }))
@@ -85,6 +85,8 @@ async function main() {
 
   // 根据配置创建传输层
   const transportConfig = configManager.getTransportConfig()
+
+  console.log('transportConfig', transportConfig)
 
   if (transportConfig.type === 'http') {
     transport = new HttpTransport(transportConfig.port)
@@ -170,17 +172,13 @@ async function onReceiveStart(requestData: unknown) {
   const logger = getLogger()
   const data = parseRequestData(requestData)
   const rssi = data?.rssi || '-60'
-  const deviceId = data?.did
 
-  logger.info('Main', '收到启动扫描指令', { rssi, deviceId })
+  logger.info('Main', '收到启动扫描指令', { rssi })
 
   try {
-    await deviceManager?.startScan(rssi, deviceId)
-    const message = deviceId
-      ? `设备 ${deviceId} 开始扫描`
-      : '所有设备开始扫描'
-    logger.info('Main', message)
-    return createStatusResponse({ msg: message })
+    await deviceManager?.startScan(rssi)
+    logger.info('Main', '所有设备开始扫描')
+    return createStatusResponse({ msg: '所有设备开始扫描' })
   }
   catch (error: any) {
     logger.error('Main', '启动扫描失败:', error)
@@ -193,20 +191,13 @@ async function onReceiveStart(requestData: unknown) {
  * @param requestData 请求数据
  * @returns 停止扫描响应
  */
-async function onReceiveStop(requestData: unknown) {
+async function onReceiveStop() {
   const logger = getLogger()
-  const data = parseRequestData(requestData)
-  const deviceId = data?.did
-
-  logger.info('Main', '收到停止扫描指令', { deviceId })
 
   try {
-    await deviceManager?.stopScan(deviceId)
-    const message = deviceId
-      ? `设备 ${deviceId} 停止扫描`
-      : '所有设备停止扫描'
-    logger.info('Main', message)
-    return createStatusResponse({ msg: message })
+    await deviceManager?.stopScan()
+    logger.info('Main', '所有设备停止扫描')
+    return createStatusResponse({ msg: '所有设备停止扫描' })
   }
   catch (error: any) {
     logger.error('Main', '停止扫描失败:', error)
