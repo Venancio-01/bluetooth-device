@@ -123,7 +123,6 @@ func (h *HttpTransport) handleCommand(w http.ResponseWriter, r *http.Request) {
 	// 创建响应回调
 	callback := func(response string) {
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(response))
 	}
 
