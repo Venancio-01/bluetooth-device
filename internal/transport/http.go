@@ -120,16 +120,19 @@ func (h *HttpTransport) handleCommand(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 创建响应回调
+	// 创建响应通道
+	responseChan := make(chan string, 1)
 	callback := func(response string) {
-		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(response))
+		responseChan <- response
 	}
 
 	// 发送到接收通道
 	select {
 	case h.receiveChan <- RequestWithCallback{Request: request, Callback: callback}:
-		// 请求已发送到通道，回调将在处理完成后调用
+		// 等待响应
+		response := <-responseChan
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(response))
 	default:
 		http.Error(w, "Server busy", http.StatusServiceUnavailable)
 	}

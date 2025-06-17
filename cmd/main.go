@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -24,8 +25,13 @@ func handleMessage(blueDevice *bluetooth.BlueDevice, req *communication.Request)
 	case communication.START:
 		rssi := "-50" // 默认值，根据协议文档修改为-50
 		if req.Data != nil {
+			// 支持字符串和数字类型的RSSI值
 			if rssiVal, ok := req.Data["rssi"].(string); ok && rssiVal != "" {
 				rssi = rssiVal
+			} else if rssiVal, ok := req.Data["rssi"].(float64); ok {
+				rssi = fmt.Sprintf("%.0f", rssiVal)
+			} else if rssiVal, ok := req.Data["rssi"].(int); ok {
+				rssi = fmt.Sprintf("%d", rssiVal)
 			}
 		}
 		log.Printf("收到启动扫描指令，RSSI: %s", rssi)
@@ -76,7 +82,14 @@ func main() {
 	log.Println("启动蓝牙设备服务...")
 
 	// 创建蓝牙设备和传输层实例
-	blueDevice := bluetooth.NewBlueDevice()
+	// 检查是否有模拟模式参数
+	var blueDevice *bluetooth.BlueDevice
+	if len(os.Args) > 1 && os.Args[1] == "--mock" {
+		log.Println("使用模拟模式")
+		blueDevice = bluetooth.NewBlueDeviceMock()
+	} else {
+		blueDevice = bluetooth.NewBlueDevice()
+	}
 	httpTransport := transport.NewHttpTransport(8888)
 
 	// 连接蓝牙设备

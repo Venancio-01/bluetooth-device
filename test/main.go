@@ -64,10 +64,16 @@ func sendCommand(cmdCode int, data interface{}) {
 		return
 	}
 
-	// 为了美化输出，我们将响应体解析并重新格式化打印
+	// 先读取响应体数据
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Printf("  - 读取响应体失败: %v", err)
+		return
+	}
+
+	// 尝试解析JSON并美化输出
 	var result map[string]interface{}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		bodyBytes, _ := io.ReadAll(resp.Body)
+	if err := json.Unmarshal(bodyBytes, &result); err != nil {
 		fmt.Printf("  - 无法解析JSON响应，原始数据: %s\n", string(bodyBytes))
 		return
 	}

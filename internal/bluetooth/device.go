@@ -42,6 +42,7 @@ type BlueDevice struct {
 	mutex           sync.Mutex      // 用于保护共享状态
 	heartbeatTicker *time.Ticker    // 心跳定时器
 	heartbeatStop   chan bool       // 心跳停止信号
+	mockMode        bool            // 模拟模式，用于测试
 }
 
 // NewBlueDevice 创建新的蓝牙设备实例
@@ -52,11 +53,29 @@ func NewBlueDevice() *BlueDevice {
 		deviceEvents:    make(chan string, 10),
 		detectedDevices: make(map[string]bool),
 		heartbeatStop:   make(chan bool),
+		mockMode:        false,
+	}
+}
+
+// NewBlueDeviceMock 创建模拟模式的蓝牙设备实例（用于测试）
+func NewBlueDeviceMock() *BlueDevice {
+	return &BlueDevice{
+		initializeState: Initialized, // 模拟模式下直接设为已初始化
+		isScanning:      false,
+		deviceEvents:    make(chan string, 10),
+		detectedDevices: make(map[string]bool),
+		heartbeatStop:   make(chan bool),
+		mockMode:        true,
 	}
 }
 
 // Connect 连接串口
 func (bd *BlueDevice) Connect() error {
+	if bd.mockMode {
+		log.Println("模拟模式：跳过串口连接")
+		return nil
+	}
+
 	mode := &serial.Mode{
 		BaudRate: 115200,
 		Parity:   serial.NoParity,
@@ -100,6 +119,11 @@ func (bd *BlueDevice) Disconnect() error {
 
 // Send 发送数据到串口
 func (bd *BlueDevice) Send(data string) error {
+	if bd.mockMode {
+		log.Printf("模拟模式：发送数据: %s", strings.TrimSpace(data))
+		return nil
+	}
+
 	if bd.port == nil {
 		return fmt.Errorf("serial port not connected")
 	}
@@ -270,6 +294,12 @@ func (bd *BlueDevice) StartScan(rssi string) error {
 	bd.isScanning = true
 
 	log.Printf("开始扫描，RSSI阈值: %s", rssi)
+
+	if bd.mockMode {
+		log.Println("模拟模式：扫描已启动")
+		return nil
+	}
+
 	// 设置设备为观察者模式
 	if err := bd.sendAndSleep(BuildObserverCommand(rssi), 0); err != nil {
 		bd.isScanning = false
@@ -293,6 +323,13 @@ func (bd *BlueDevice) stopScanInternal() error {
 	}
 
 	log.Println("停止扫描")
+
+	if bd.mockMode {
+		log.Println("模拟模式：扫描已停止")
+		bd.isScanning = false
+		return nil
+	}
+
 	// 停止扫描
 	if err := bd.sendAndSleep(BuildStopObserverCommand(), 0); err != nil {
 		return fmt.Errorf("停止扫描失败: %w", err)
