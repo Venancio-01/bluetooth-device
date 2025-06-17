@@ -64,14 +64,10 @@ export class DeviceManager extends EventEmitter {
     const device = new BlueDevice(config.serialPath, config.deviceId)
     const deviceId = device.getDeviceId()
 
-    // 监听设备事件并转发，添加设备标识
+    // 监听设备事件并转发
     device.on('device', (deviceData) => {
       console.log(`[DeviceManager] 设备 ${deviceId} 上报:`, deviceData)
-      this.emit('device', {
-        ...deviceData,
-        sourceDeviceId: deviceId,
-        sourceSerialPath: device.getSerialPath(),
-      })
+      this.emit('device', deviceData)
     })
 
     // 监听设备错误

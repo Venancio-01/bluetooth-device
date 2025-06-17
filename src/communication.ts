@@ -5,8 +5,7 @@ import { z } from 'zod'
 // 命令码 (上位机 -> 程序)
 export const CommandCode = {
   START: 1,
-  HEARTBEAT: 2,
-  STOP: 3,
+  STOP: 2,
 } as const
 
 // 事件/响应码 (程序 -> 上位机)
@@ -14,6 +13,7 @@ export const EventTypeCode = {
   STATUS: 1,
   ERROR: 2,
   DEVICE: 3,
+  HEARTBEAT: 4,
 } as const
 
 // 2. 通信格式定义
@@ -24,10 +24,9 @@ const RequestSchema = z.object({
   d: z.record(z.unknown()).optional(),
 })
 
-// 扩展的请求数据格式，支持设备标识
+// 请求数据格式
 export const RequestDataSchema = z.object({
   rssi: z.string().optional(),
-  did: z.string().optional(), // 设备ID，用于指定特定设备
 }).passthrough() // 允许其他字段通过
 
 // 响应/上报格式 (程序 -> 上位机)
@@ -54,16 +53,53 @@ export function createStatusResponse(data: Record<string, unknown>): string {
   return JSON.stringify(payload)
 }
 
+// 错误代码定义
+export const ErrorCode = {
+  INVALID_MESSAGE_FORMAT: 'E001',
+  UNKNOWN_COMMAND: 'E002',
+  COMMAND_EXECUTION_FAILED: 'E003',
+  DEVICE_NOT_FOUND: 'E004',
+  DEVICE_BUSY: 'E005',
+  SCAN_START_FAILED: 'E006',
+  SCAN_STOP_FAILED: 'E007',
+  INTERNAL_ERROR: 'E999',
+} as const
+
+// 错误信息接口
+export interface ErrorInfo {
+  code: string
+  message: string
+  suggestion?: string
+  context?: Record<string, unknown>
+}
+
 /**
  * 创建一个标准的错误响应
- * @param data 负载数据
+ * @param errorInfo 错误信息对象
  */
-export function createErrorResponse(data: Record<string, unknown>): string {
+export function createErrorResponse(errorInfo: ErrorInfo): string {
   const payload: ResponsePayload = {
     t: EventTypeCode.ERROR,
-    d: data,
+    d: {
+      code: errorInfo.code,
+      msg: errorInfo.message,
+      suggestion: errorInfo.suggestion,
+      context: errorInfo.context,
+    },
   }
   return JSON.stringify(payload)
+}
+
+/**
+ * 创建一个简单的错误响应（向后兼容）
+ * @param message 错误消息
+ * @param code 错误代码，默认为内部错误
+ */
+export function createSimpleErrorResponse(message: string, code: string = ErrorCode.INTERNAL_ERROR): string {
+  return createErrorResponse({
+    code,
+    message,
+  })
 }
 
 /**
@@ -73,17 +109,20 @@ export function createErrorResponse(data: Record<string, unknown>): string {
 export function createDeviceEvent(data: Record<string, unknown>): string {
   const payload: ResponsePayload = {
     t: EventTypeCode.DEVICE,
-    d: {
-      ...data,
-      // 确保设备标识字段使用缩写
-      did: data['deviceId'] || data['did'],
-      sp: data['serialPath'] || data['sp'],
-    },
+    d: data,
   }
-  // 移除原始的完整字段名，只保留缩写
-  if (payload.d['deviceId']) delete payload.d['deviceId']
-  if (payload.d['serialPath']) delete payload.d['serialPath']
+  return JSON.stringify(payload)
+}
 
+/**
+ * 创建一个心跳事件消息
+ * @param data 负载数据
+ */
+export function createHeartbeatEvent(data: Record<string, unknown>): string {
+  const payload: ResponsePayload = {
+    t: EventTypeCode.HEARTBEAT,
+    d: data,
+  }
   return JSON.stringify(payload)
 }
 

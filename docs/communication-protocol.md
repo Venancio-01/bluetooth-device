@@ -37,8 +37,6 @@
 | `running`      | `run`                    | 运行状态 |
 | `manufacturer` | `mf`                     | 制造商 |
 | `rssi`         | `rs`                     | RSSI 信号强度 |
-| `deviceId`     | `did`                    | 设备标识符 |
-| `serialPath`   | `sp`                     | 串口路径 |
 
 **厂商列表 (Manufacturer):**
 

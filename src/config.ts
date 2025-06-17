@@ -159,7 +159,6 @@ export class ConfigManager {
    * 获取传输层配置
    */
   getTransportConfig() {
-    console.log('this.config', this.config)
     return this.config.enabledTransports === 'http' ? this.config.httpTransport : this.config.serialTransport
   }
 

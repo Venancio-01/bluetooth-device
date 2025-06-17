@@ -5,22 +5,20 @@ import process2 from "process";
 import { z } from "zod";
 var CommandCode = {
   START: 1,
-  HEARTBEAT: 2,
-  STOP: 3
+  STOP: 2
 };
 var EventTypeCode = {
   STATUS: 1,
   ERROR: 2,
-  DEVICE: 3
+  DEVICE: 3,
+  HEARTBEAT: 4
 };
 var RequestSchema = z.object({
   c: z.nativeEnum(CommandCode),
   d: z.record(z.unknown()).optional()
 });
 var RequestDataSchema = z.object({
-  rssi: z.string().optional(),
-  did: z.string().optional()
-  // 设备ID，用于指定特定设备
+  rssi: z.string().optional()
 }).passthrough();
 var ResponseSchema = z.object({
   t: z.nativeEnum(EventTypeCode),
@@ -33,25 +31,40 @@ function createStatusResponse(data) {
   };
   return JSON.stringify(payload);
 }
-function createErrorResponse(data) {
+var ErrorCode = {
+  INVALID_MESSAGE_FORMAT: "E001",
+  UNKNOWN_COMMAND: "E002",
+  COMMAND_EXECUTION_FAILED: "E003",
+  DEVICE_NOT_FOUND: "E004",
+  DEVICE_BUSY: "E005",
+  SCAN_START_FAILED: "E006",
+  SCAN_STOP_FAILED: "E007",
+  INTERNAL_ERROR: "E999"
+};
+function createErrorResponse(errorInfo) {
   const payload = {
     t: EventTypeCode.ERROR,
-    d: data
+    d: {
+      code: errorInfo.code,
+      msg: errorInfo.message,
+      suggestion: errorInfo.suggestion,
+      context: errorInfo.context
+    }
   };
   return JSON.stringify(payload);
 }
 function createDeviceEvent(data) {
   const payload = {
     t: EventTypeCode.DEVICE,
-    d: {
-      ...data,
-      // 确保设备标识字段使用缩写
-      did: data["deviceId"] || data["did"],
-      sp: data["serialPath"] || data["sp"]
-    }
+    d: data
   };
-  if (payload.d["deviceId"]) delete payload.d["deviceId"];
-  if (payload.d["serialPath"]) delete payload.d["serialPath"];
+  return JSON.stringify(payload);
+}
+function createHeartbeatEvent(data) {
+  const payload = {
+    t: EventTypeCode.HEARTBEAT,
+    d: data
+  };
   return JSON.stringify(payload);
 }
 function parseRequestData(data) {
@@ -198,7 +211,6 @@ var ConfigManager = class {
    * 获取传输层配置
    */
   getTransportConfig() {
-    console.log("this.config", this.config);
     return this.config.enabledTransports === "http" ? this.config.httpTransport : this.config.serialTransport;
   }
   /**
@@ -582,11 +594,7 @@ var DeviceManager = class extends EventEmitter2 {
     const deviceId = device.getDeviceId();
     device.on("device", (deviceData) => {
       console.log(`[DeviceManager] \u8BBE\u5907 ${deviceId} \u4E0A\u62A5:`, deviceData);
-      this.emit("device", {
-        ...deviceData,
-        sourceDeviceId: deviceId,
-        sourceSerialPath: device.getSerialPath()
-      });
+      this.emit("device", deviceData);
     });
     device.on("error", (error) => {
       console.error(`[DeviceManager] \u8BBE\u5907 ${deviceId} \u9519\u8BEF:`, error);
@@ -828,7 +836,16 @@ var HttpTransport = class extends EventEmitter3 {
         };
         this.emit("data", req.body, cb);
       } catch (error) {
-        res.status(500).send({ error: "Internal Server Error", message: error.message });
+        res.status(500).json({
+          t: 2,
+          // ERROR
+          d: {
+            code: "E999",
+            msg: "Internal Server Error",
+            suggestion: "Please check the request format and try again",
+            context: { error: error.message }
+          }
+        });
       }
     });
     this.app.get("/events", this.setupSse);
@@ -1120,26 +1137,62 @@ var SerialTransport = class extends EventEmitter4 {
 // src/index.ts
 var deviceManager = null;
 var transport = null;
+var heartbeatTimer = null;
 async function handleMessage(message, cb) {
   const request = message;
   if (!request) {
-    const errorResponse = createErrorResponse({ msg: "Invalid message format" });
+    const errorResponse = createErrorResponse({
+      code: ErrorCode.INVALID_MESSAGE_FORMAT,
+      message: "Invalid message format",
+      suggestion: "Please check the message format and ensure it follows the protocol specification"
+    });
     return cb(errorResponse);
   }
   try {
     switch (request.c) {
-      case CommandCode.HEARTBEAT:
-        return cb(onReceiveHeartbeat());
       case CommandCode.START:
         return cb(await onReceiveStart(request.d));
       case CommandCode.STOP:
         return cb(await onReceiveStop());
       default:
-        return cb(createErrorResponse({ msg: "Unknown command" }));
+        return cb(createErrorResponse({
+          code: ErrorCode.UNKNOWN_COMMAND,
+          message: "Unknown command",
+          suggestion: "Please check the command code and ensure it is supported",
+          context: { receivedCommand: request.c }
+        }));
     }
   } catch (error) {
     console.error("\u5904\u7406\u6307\u4EE4\u65F6\u53D1\u751F\u9519\u8BEF:", error);
-    return cb(createErrorResponse({ msg: error.message || "Failed to execute command" }));
+    return cb(createErrorResponse({
+      code: ErrorCode.COMMAND_EXECUTION_FAILED,
+      message: error.message || "Failed to execute command",
+      suggestion: "Please check the device status and try again",
+      context: { command: request.c, error: error.message }
+    }));
+  }
+}
+function startHeartbeat() {
+  if (heartbeatTimer) {
+    clearInterval(heartbeatTimer);
+  }
+  heartbeatTimer = setInterval(() => {
+    if (transport && deviceManager) {
+      const stats = deviceManager.getConnectionStats();
+      const heartbeatData = createHeartbeatEvent({
+        run: stats.connected > 0,
+        connected: stats.connected,
+        total: stats.total,
+        reconnecting: stats.reconnecting
+      });
+      transport.send(heartbeatData);
+    }
+  }, 2e3);
+}
+function stopHeartbeat() {
+  if (heartbeatTimer) {
+    clearInterval(heartbeatTimer);
+    heartbeatTimer = null;
   }
 }
 async function main() {
@@ -1167,7 +1220,6 @@ async function main() {
   });
   deviceManager = new DeviceManager(deviceConfigs);
   const transportConfig = configManager2.getTransportConfig();
-  console.log("transportConfig", transportConfig);
   if (transportConfig.type === "http") {
     transport = new HttpTransport(transportConfig.port);
     logger2.info("Main", `\u4F7F\u7528 HTTP \u4F20\u8F93\u5C42\uFF0C\u7AEF\u53E3: ${transportConfig.port}`);
@@ -1208,17 +1260,12 @@ async function main() {
       logger2.error("Main", "\u6CA1\u6709\u8BBE\u5907\u8FDE\u63A5\u6210\u529F\uFF0C\u7A0B\u5E8F\u9000\u51FA");
       process2.exit(1);
     }
+    startHeartbeat();
+    logger2.info("Main", "\u5FC3\u8DF3\u5B9A\u65F6\u5668\u5DF2\u542F\u52A8");
   } catch (error) {
     logger2.error("Main", "\u542F\u52A8\u5931\u8D25:", error);
     process2.exit(1);
   }
-}
-function onReceiveHeartbeat() {
-  const logger2 = getLogger();
-  logger2.debug("Main", "\u6536\u5230\u5FC3\u8DF3\u6307\u4EE4");
-  return createStatusResponse({
-    run: true
-  });
 }
 async function onReceiveStart(requestData) {
   const logger2 = getLogger();
@@ -1228,10 +1275,15 @@ async function onReceiveStart(requestData) {
   try {
     await deviceManager?.startScan(rssi);
     logger2.info("Main", "\u6240\u6709\u8BBE\u5907\u5F00\u59CB\u626B\u63CF");
-    return createStatusResponse({ msg: "\u6240\u6709\u8BBE\u5907\u5F00\u59CB\u626B\u63CF" });
+    return createStatusResponse({ msg: "Scan started" });
   } catch (error) {
     logger2.error("Main", "\u542F\u52A8\u626B\u63CF\u5931\u8D25:", error);
-    return createErrorResponse({ msg: error.message || "Failed to start scan" });
+    return createErrorResponse({
+      code: ErrorCode.SCAN_START_FAILED,
+      message: error.message || "Failed to start scan",
+      suggestion: "Please check device connections and try again",
+      context: { rssi, error: error.message }
+    });
   }
 }
 async function onReceiveStop() {
@@ -1239,16 +1291,22 @@ async function onReceiveStop() {
   try {
     await deviceManager?.stopScan();
     logger2.info("Main", "\u6240\u6709\u8BBE\u5907\u505C\u6B62\u626B\u63CF");
-    return createStatusResponse({ msg: "\u6240\u6709\u8BBE\u5907\u505C\u6B62\u626B\u63CF" });
+    return createStatusResponse({ msg: "Scan stopped" });
   } catch (error) {
     logger2.error("Main", "\u505C\u6B62\u626B\u63CF\u5931\u8D25:", error);
-    return createErrorResponse({ msg: error.message || "Failed to stop scan" });
+    return createErrorResponse({
+      code: ErrorCode.SCAN_STOP_FAILED,
+      message: error.message || "Failed to stop scan",
+      suggestion: "Please check device connections and try again",
+      context: { error: error.message }
+    });
   }
 }
 process2.on("SIGINT", async () => {
   const logger2 = getLogger();
   logger2.info("Main", "\n\u6B63\u5728\u5173\u95ED\u7A0B\u5E8F...");
   try {
+    stopHeartbeat();
     await deviceManager?.disconnectAll();
     await transport?.stop();
     logger2.info("Main", "\u7A0B\u5E8F\u5DF2\u5B89\u5168\u5173\u95ED");

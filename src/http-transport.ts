@@ -57,7 +57,15 @@ export class HttpTransport extends EventEmitter implements ITransport {
         this.emit('data', req.body, cb)
       }
       catch (error: any) {
-        res.status(500).send({ error: 'Internal Server Error', message: error.message })
+        res.status(500).json({
+          t: 2, // ERROR
+          d: {
+            code: 'E999',
+            msg: 'Internal Server Error',
+            suggestion: 'Please check the request format and try again',
+            context: { error: error.message },
+          },
+        })
       }
     })
 
