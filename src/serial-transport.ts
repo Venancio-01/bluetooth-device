@@ -174,7 +174,6 @@ export class SerialTransport extends EventEmitter implements ITransport {
     }
     catch (error) {
       logger.error('SerialTransport', '处理接收数据失败:', error)
-      this.emit('error', error)
     }
   }
 

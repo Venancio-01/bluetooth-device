@@ -1095,7 +1095,6 @@ var SerialTransport = class extends EventEmitter4 {
       this.emit("data", data, responseCallback);
     } catch (error) {
       logger.error("SerialTransport", "\u5904\u7406\u63A5\u6536\u6570\u636E\u5931\u8D25:", error);
-      this.emit("error", error);
     }
   }
   /**
