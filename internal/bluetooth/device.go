@@ -52,7 +52,7 @@ func NewBlueDevice() *BlueDevice {
 		isScanning:      false,
 		deviceEvents:    make(chan string, 10),
 		detectedDevices: make(map[string]bool),
-		heartbeatStop:   make(chan bool),
+		heartbeatStop:   make(chan bool, 1), // 使用带缓冲的通道
 		mockMode:        false,
 	}
 }
@@ -64,7 +64,7 @@ func NewBlueDeviceMock() *BlueDevice {
 		isScanning:      false,
 		deviceEvents:    make(chan string, 10),
 		detectedDevices: make(map[string]bool),
-		heartbeatStop:   make(chan bool),
+		heartbeatStop:   make(chan bool, 1), // 使用带缓冲的通道
 		mockMode:        true,
 	}
 }
@@ -404,10 +404,11 @@ func (bd *BlueDevice) stopHeartbeat() {
 		bd.heartbeatTicker.Stop()
 		bd.heartbeatTicker = nil
 
-		// 发送停止信号
+		// 非阻塞发送停止信号
 		select {
 		case bd.heartbeatStop <- true:
 		default:
+			// 如果通道满了或没有接收者，直接跳过
 		}
 	}
 }

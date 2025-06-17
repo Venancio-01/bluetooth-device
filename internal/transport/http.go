@@ -1,11 +1,13 @@
 package transport
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"sync"
+	"time"
 
 	"hjrich.com/bluetooth-device/internal/communication"
 )
@@ -67,7 +69,10 @@ func (h *HttpTransport) Stop() error {
 
 	if h.server != nil {
 		log.Println("HTTP server stopped")
-		return h.server.Close()
+		// 使用Shutdown而不是Close来优雅关闭
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		return h.server.Shutdown(ctx)
 	}
 	return nil
 }
