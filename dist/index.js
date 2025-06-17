@@ -1132,7 +1132,7 @@ async function handleMessage(message, cb) {
       case CommandCode.START:
         return cb(await onReceiveStart(request.d));
       case CommandCode.STOP:
-        return cb(await onReceiveStop(request.d));
+        return cb(await onReceiveStop());
       default:
         return cb(createErrorResponse({ msg: "Unknown command" }));
     }
@@ -1166,6 +1166,7 @@ async function main() {
   });
   deviceManager = new DeviceManager(deviceConfigs);
   const transportConfig = configManager2.getTransportConfig();
+  console.log("transportConfig", transportConfig);
   if (transportConfig.type === "http") {
     transport = new HttpTransport(transportConfig.port);
     logger2.info("Main", `\u4F7F\u7528 HTTP \u4F20\u8F93\u5C42\uFF0C\u7AEF\u53E3: ${transportConfig.port}`);
@@ -1222,28 +1223,22 @@ async function onReceiveStart(requestData) {
   const logger2 = getLogger();
   const data = parseRequestData(requestData);
   const rssi = data?.rssi || "-60";
-  const deviceId = data?.did;
-  logger2.info("Main", "\u6536\u5230\u542F\u52A8\u626B\u63CF\u6307\u4EE4", { rssi, deviceId });
+  logger2.info("Main", "\u6536\u5230\u542F\u52A8\u626B\u63CF\u6307\u4EE4", { rssi });
   try {
-    await deviceManager?.startScan(rssi, deviceId);
-    const message = deviceId ? `\u8BBE\u5907 ${deviceId} \u5F00\u59CB\u626B\u63CF` : "\u6240\u6709\u8BBE\u5907\u5F00\u59CB\u626B\u63CF";
-    logger2.info("Main", message);
-    return createStatusResponse({ msg: message });
+    await deviceManager?.startScan(rssi);
+    logger2.info("Main", "\u6240\u6709\u8BBE\u5907\u5F00\u59CB\u626B\u63CF");
+    return createStatusResponse({ msg: "\u6240\u6709\u8BBE\u5907\u5F00\u59CB\u626B\u63CF" });
   } catch (error) {
     logger2.error("Main", "\u542F\u52A8\u626B\u63CF\u5931\u8D25:", error);
     return createErrorResponse({ msg: error.message || "Failed to start scan" });
   }
 }
-async function onReceiveStop(requestData) {
+async function onReceiveStop() {
   const logger2 = getLogger();
-  const data = parseRequestData(requestData);
-  const deviceId = data?.did;
-  logger2.info("Main", "\u6536\u5230\u505C\u6B62\u626B\u63CF\u6307\u4EE4", { deviceId });
   try {
-    await deviceManager?.stopScan(deviceId);
-    const message = deviceId ? `\u8BBE\u5907 ${deviceId} \u505C\u6B62\u626B\u63CF` : "\u6240\u6709\u8BBE\u5907\u505C\u6B62\u626B\u63CF";
-    logger2.info("Main", message);
-    return createStatusResponse({ msg: message });
+    await deviceManager?.stopScan();
+    logger2.info("Main", "\u6240\u6709\u8BBE\u5907\u505C\u6B62\u626B\u63CF");
+    return createStatusResponse({ msg: "\u6240\u6709\u8BBE\u5907\u505C\u6B62\u626B\u63CF" });
   } catch (error) {
     logger2.error("Main", "\u505C\u6B62\u626B\u63CF\u5931\u8D25:", error);
     return createErrorResponse({ msg: error.message || "Failed to stop scan" });
