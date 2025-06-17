@@ -10,7 +10,9 @@
   "scripts": {
     "dev": "tsup --watch",
     "build": "tsup",
-    "start": "node dist/src/index.js"
+    "start": "node dist/src/index.js",
+    "lint": "eslint src/**/*.ts",
+    "lint:fix": "eslint src/**/*.ts --fix"
   },
   "dependencies": {
     "@serialport/parser-readline": "^13.0.0",
