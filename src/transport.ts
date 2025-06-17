@@ -6,5 +6,5 @@ export interface ITransport extends EventEmitter {
   start: () => Promise<void>
   stop: () => Promise<void>
   send: (data: string) => void
-  on: (event: 'data', listener: (message: string, cb: ResponseCallback) => void) => this
+  on: (event: 'data', listener: (message: any, cb: ResponseCallback) => void) => this
 }

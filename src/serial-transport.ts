@@ -162,21 +162,15 @@ export class SerialTransport extends EventEmitter implements ITransport {
   /**
    * 处理接收到的数据
    */
-  private handleReceivedData(data: string): void {
+  private handleReceivedData(data: any): void {
     try {
-      // 尝试解析JSON数据
-      const trimmedData = data.trim()
-      if (!trimmedData) {
-        return
-      }
-
       // 创建响应回调函数
       const responseCallback: ResponseCallback = (response: string) => {
         this.send(response)
       }
 
       // 触发数据事件，传递给业务层处理
-      this.emit('data', trimmedData, responseCallback)
+      this.emit('data', data, responseCallback)
     }
     catch (error) {
       logger.error('SerialTransport', '处理接收数据失败:', error)
