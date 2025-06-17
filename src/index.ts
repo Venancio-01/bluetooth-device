@@ -39,10 +39,10 @@ async function handleMessage(message: any, cb: ResponseCallback) {
 
   try {
     switch (request.c) {
-      case CommandCode.START || '1':
+      case '1':
         return cb(await onReceiveStart(request.d))
 
-      case CommandCode.STOP || '2':
+      case '2':
         return cb(await onReceiveStop())
 
       default:
