@@ -48,13 +48,6 @@ $(BUILD_DIR):
 $(DIST_DIR):
 	@mkdir -p $(DIST_DIR)
 
-# 本地构建
-.PHONY: build
-build: ## 本地平台构建
-	@echo "🔨 本地构建..."
-	@go build -ldflags="$(LDFLAGS)" -o $(PROJECT_NAME) $(MAIN_FILE)
-	@echo "✅ 构建完成: $(PROJECT_NAME)"
-
 # Orange Pi 构建
 .PHONY: orangepi
 orangepi: $(BUILD_DIR) ## Orange Pi (ARMv7) 构建
