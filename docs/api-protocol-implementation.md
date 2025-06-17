@@ -162,9 +162,6 @@ function startHeartbeat() {
       const stats = deviceManager.getConnectionStats()
       const heartbeatData = createHeartbeatEvent({
         run: stats.connected > 0,
-        connected: stats.connected,
-        total: stats.total,
-        reconnecting: stats.reconnecting,
       })
       transport.send(heartbeatData)
     }

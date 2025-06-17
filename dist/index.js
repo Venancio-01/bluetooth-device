@@ -1150,9 +1150,9 @@ async function handleMessage(message, cb) {
   }
   try {
     switch (request.c) {
-      case CommandCode.START:
+      case (CommandCode.START || "1"):
         return cb(await onReceiveStart(request.d));
-      case CommandCode.STOP:
+      case (CommandCode.STOP || "2"):
         return cb(await onReceiveStop());
       default:
         return cb(createErrorResponse({
@@ -1180,10 +1180,7 @@ function startHeartbeat() {
     if (transport && deviceManager) {
       const stats = deviceManager.getConnectionStats();
       const heartbeatData = createHeartbeatEvent({
-        run: stats.connected > 0,
-        connected: stats.connected,
-        total: stats.total,
-        reconnecting: stats.reconnecting
+        run: stats.connected > 0
       });
       transport.send(heartbeatData);
     }
