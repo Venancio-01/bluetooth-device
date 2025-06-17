@@ -121,7 +121,14 @@ export class SerialTransport extends EventEmitter implements ITransport {
         // 监听数据接收事件
         this.parser.on('data', (data: string) => {
           logger.debug('SerialTransport', '接收数据:', data)
-          this.handleReceivedData(data)
+          try {
+            const message = JSON.parse(data)
+            this.handleReceivedData(message)
+          }
+          catch (error) {
+            logger.error('SerialTransport', '处理接收数据失败:', error)
+            this.emit('error', error)
+          }
         })
 
         // 打开串口

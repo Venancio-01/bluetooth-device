@@ -1053,7 +1053,13 @@ var SerialTransport = class extends EventEmitter4 {
         });
         this.parser.on("data", (data) => {
           logger.debug("SerialTransport", "\u63A5\u6536\u6570\u636E:", data);
-          this.handleReceivedData(data);
+          try {
+            const message = JSON.parse(data);
+            this.handleReceivedData(message);
+          } catch (error) {
+            logger.error("SerialTransport", "\u5904\u7406\u63A5\u6536\u6570\u636E\u5931\u8D25:", error);
+            this.emit("error", error);
+          }
         });
         this.port.open();
       } catch (error) {
