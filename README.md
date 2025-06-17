@@ -8,7 +8,7 @@
 - **设备标识**: 每个设备事件都包含来源设备信息
 - **灵活配置**: 支持配置文件和环境变量两种配置方式
 - **错误隔离**: 单个设备故障不影响其他设备正常工作
-- **HTTP传输**: 通过HTTP API和SSE事件流与上位机通信
+- **多传输层支持**: 支持HTTP和串口两种传输方式与上位机通信
 - **实时监控**: 支持设备连接状态监控和统计
 
 ## 快速开始
@@ -67,11 +67,47 @@ npm start
 npm run dev
 ```
 
+## 传输层配置
+
+本系统支持两种传输层：HTTP 传输层和串口传输层。
+
+### HTTP 传输层
+
+使用 HTTP API 和 SSE 事件流与上位机通信：
+
+```json
+{
+  "transport": {
+    "type": "http",
+    "port": 8888
+  }
+}
+```
+
+### 串口传输层
+
+通过串口与上位机进行双向通信：
+
+```json
+{
+  "transport": {
+    "type": "serial",
+    "serialPath": "/dev/ttyUSB2",
+    "baudRate": 115200,
+    "dataBits": 8,
+    "stopBits": 1,
+    "parity": "none",
+    "timeout": 5000
+  }
+}
+```
+
 ## API 接口
 
-### HTTP 接口
+### HTTP 接口（仅HTTP传输层）
 
 #### 发送命令
+
 ```
 POST /command
 Content-Type: application/json
@@ -83,10 +119,16 @@ Content-Type: application/json
 ```
 
 #### 接收事件
+
 ```
 GET /events
 ```
+
 返回 Server-Sent Events (SSE) 流
+
+### 串口接口（仅串口传输层）
+
+通过串口发送和接收JSON格式的命令和事件数据。
 
 ### 命令格式
 
@@ -181,10 +223,24 @@ GET /events
 
 ### 传输配置
 
+#### HTTP 传输层配置
+
 | 字段 | 类型 | 必填 | 默认值 | 说明 |
 |------|------|------|--------|------|
-| type | string | 否 | "http" | 传输类型（目前仅支持http） |
+| type | string | 是 | - | 传输类型，设置为 "http" |
 | port | number | 否 | 8888 | HTTP服务端口 |
+
+#### 串口传输层配置
+
+| 字段 | 类型 | 必填 | 默认值 | 说明 |
+|------|------|------|--------|------|
+| type | string | 是 | - | 传输类型，设置为 "serial" |
+| serialPath | string | 是 | - | 串口设备路径 |
+| baudRate | number | 否 | 115200 | 串口波特率 |
+| dataBits | number | 否 | 8 | 数据位数 |
+| stopBits | number | 否 | 1 | 停止位数 |
+| parity | string | 否 | "none" | 校验位 (none/even/odd) |
+| timeout | number | 否 | 5000 | 超时时间（毫秒） |
 
 ### 日志配置
 

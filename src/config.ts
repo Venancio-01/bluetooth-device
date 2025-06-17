@@ -12,12 +12,26 @@ const DeviceConfigSchema = z.object({
   enabled: z.boolean().optional().default(true),
 })
 
+const HttpTransportConfigSchema = z.object({
+  type: z.literal('http'),
+  port: z.number().optional().default(8888),
+})
+
+const SerialTransportConfigSchema = z.object({
+  type: z.literal('serial'),
+  serialPath: z.string(),
+  baudRate: z.number().optional().default(115200),
+  dataBits: z.number().optional().default(8),
+  stopBits: z.number().optional().default(1),
+  parity: z.enum(['none', 'even', 'odd']).optional().default('none'),
+  timeout: z.number().optional().default(5000), // 超时时间（毫秒）
+})
+
 const AppConfigSchema = z.object({
   devices: z.array(DeviceConfigSchema),
-  transport: z.object({
-    type: z.enum(['http']).default('http'),
-    port: z.number().optional().default(8888),
-  }).optional().default({ type: 'http', port: 8888 }),
+  enabledTransports: z.enum(['http', 'serial']).optional().default('http'),
+  httpTransport: HttpTransportConfigSchema.optional().default({ type: 'http', port: 8888 }),
+  serialTransport: SerialTransportConfigSchema.optional().default({ type: 'serial', serialPath: '/dev/ttyUSB0', baudRate: 115200, dataBits: 8, stopBits: 1, parity: 'none', timeout: 5000 }),
   logging: z.object({
     level: z.enum(['debug', 'info', 'warn', 'error']).optional().default('info'),
     enableDevicePrefix: z.boolean().optional().default(true),
@@ -26,6 +40,8 @@ const AppConfigSchema = z.object({
 
 export type AppConfig = z.infer<typeof AppConfigSchema>
 export type DeviceConfigWithOptions = z.infer<typeof DeviceConfigSchema>
+export type HttpTransportConfig = z.infer<typeof HttpTransportConfigSchema>
+export type SerialTransportConfig = z.infer<typeof SerialTransportConfigSchema>
 
 const DEFAULT_CONFIG: AppConfig = {
   devices: [
@@ -36,9 +52,19 @@ const DEFAULT_CONFIG: AppConfig = {
       enabled: true,
     },
   ],
-  transport: {
+  enabledTransports: 'http',
+  httpTransport: {
     type: 'http',
     port: 8888,
+  },
+  serialTransport: {
+    type: 'serial',
+    serialPath: '/dev/ttyUSB1',
+    baudRate: 115200,
+    dataBits: 8,
+    stopBits: 1,
+    parity: 'none',
+    timeout: 5000,
   },
   logging: {
     level: 'info',
@@ -133,7 +159,7 @@ export class ConfigManager {
    * 获取传输层配置
    */
   getTransportConfig() {
-    return this.config.transport
+    return this.config.enabledTransports === 'http' ? this.config.httpTransport : this.config.serialTransport
   }
 
   /**

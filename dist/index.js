@@ -79,12 +79,25 @@ var DeviceConfigSchema = z2.object({
   baudRate: z2.number().optional().default(115200),
   enabled: z2.boolean().optional().default(true)
 });
+var HttpTransportConfigSchema = z2.object({
+  type: z2.literal("http"),
+  port: z2.number().optional().default(8888)
+});
+var SerialTransportConfigSchema = z2.object({
+  type: z2.literal("serial"),
+  serialPath: z2.string(),
+  baudRate: z2.number().optional().default(115200),
+  dataBits: z2.number().optional().default(8),
+  stopBits: z2.number().optional().default(1),
+  parity: z2.enum(["none", "even", "odd"]).optional().default("none"),
+  timeout: z2.number().optional().default(5e3)
+  // 超时时间（毫秒）
+});
 var AppConfigSchema = z2.object({
   devices: z2.array(DeviceConfigSchema),
-  transport: z2.object({
-    type: z2.enum(["http"]).default("http"),
-    port: z2.number().optional().default(8888)
-  }).optional().default({ type: "http", port: 8888 }),
+  enabledTransports: z2.enum(["http", "serial"]).optional().default("http"),
+  httpTransport: HttpTransportConfigSchema.optional().default({ type: "http", port: 8888 }),
+  serialTransport: SerialTransportConfigSchema.optional().default({ type: "serial", serialPath: "/dev/ttyUSB0", baudRate: 115200, dataBits: 8, stopBits: 1, parity: "none", timeout: 5e3 }),
   logging: z2.object({
     level: z2.enum(["debug", "info", "warn", "error"]).optional().default("info"),
     enableDevicePrefix: z2.boolean().optional().default(true)
@@ -99,9 +112,19 @@ var DEFAULT_CONFIG = {
       enabled: true
     }
   ],
-  transport: {
+  enabledTransports: "http",
+  httpTransport: {
     type: "http",
     port: 8888
+  },
+  serialTransport: {
+    type: "serial",
+    serialPath: "/dev/ttyUSB1",
+    baudRate: 115200,
+    dataBits: 8,
+    stopBits: 1,
+    parity: "none",
+    timeout: 5e3
   },
   logging: {
     level: "info",
@@ -175,7 +198,7 @@ var ConfigManager = class {
    * 获取传输层配置
    */
   getTransportConfig() {
-    return this.config.transport;
+    return this.config.enabledTransports === "http" ? this.config.httpTransport : this.config.serialTransport;
   }
   /**
    * 获取日志配置
@@ -419,9 +442,7 @@ var BlueDevice = class extends EventEmitter {
         if (!hasDevice) {
           console.log(`[${this.deviceId}] manufacturer`, manufacturer);
           this.emit("device", {
-            mf: manufacturer,
-            deviceId: this.deviceId,
-            serialPath: this.serialPath
+            mf: manufacturer
           });
           this.deleteDeviceList.add(targetStr);
         }
@@ -919,6 +940,182 @@ function parseLogLevel(level) {
   }
 }
 
+// src/serial-transport.ts
+import { EventEmitter as EventEmitter4 } from "events";
+import { ReadlineParser as ReadlineParser2 } from "@serialport/parser-readline";
+import { SerialPort as SerialPort2 } from "serialport";
+var logger = getLogger();
+var SerialTransport = class extends EventEmitter4 {
+  port = null;
+  parser = null;
+  config;
+  isConnected = false;
+  reconnectTimer = null;
+  reconnectInterval = 5e3;
+  // 重连间隔（毫秒）
+  maxReconnectAttempts = 10;
+  reconnectAttempts = 0;
+  constructor(config) {
+    super();
+    this.config = config;
+  }
+  /**
+   * 启动串口传输层
+   */
+  start = async () => {
+    logger.info("SerialTransport", `\u542F\u52A8\u4E32\u53E3\u4F20\u8F93\u5C42: ${this.config.serialPath}`);
+    await this.connect();
+  };
+  /**
+   * 停止串口传输层
+   */
+  stop = async () => {
+    logger.info("SerialTransport", "\u505C\u6B62\u4E32\u53E3\u4F20\u8F93\u5C42");
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    await this.disconnect();
+  };
+  /**
+   * 发送数据到上位机
+   */
+  send = (data) => {
+    if (!this.isConnected || !this.port) {
+      logger.warn("SerialTransport", "\u4E32\u53E3\u672A\u8FDE\u63A5\uFF0C\u65E0\u6CD5\u53D1\u9001\u6570\u636E");
+      return;
+    }
+    try {
+      const dataWithNewline = data.endsWith("\n") ? data : `${data}
+`;
+      this.port.write(dataWithNewline, (err) => {
+        if (err) {
+          logger.error("SerialTransport", "\u53D1\u9001\u6570\u636E\u5931\u8D25:", err);
+          this.emit("error", err);
+        } else {
+          logger.debug("SerialTransport", "\u53D1\u9001\u6570\u636E:", data);
+        }
+      });
+    } catch (error) {
+      logger.error("SerialTransport", "\u53D1\u9001\u6570\u636E\u5F02\u5E38:", error);
+      this.emit("error", error);
+    }
+  };
+  /**
+   * 建立串口连接
+   */
+  async connect() {
+    return new Promise((resolve, reject) => {
+      try {
+        this.port = new SerialPort2({
+          path: this.config.serialPath,
+          baudRate: this.config.baudRate || 115200,
+          dataBits: this.config.dataBits,
+          stopBits: this.config.stopBits,
+          parity: this.config.parity || "none",
+          autoOpen: false
+        });
+        this.parser = this.port.pipe(new ReadlineParser2({ delimiter: "\r\n" }));
+        this.port.on("open", () => {
+          this.isConnected = true;
+          this.reconnectAttempts = 0;
+          logger.info("SerialTransport", `\u4E32\u53E3\u8FDE\u63A5\u6210\u529F: ${this.config.serialPath}`);
+          resolve();
+        });
+        this.port.on("error", (err) => {
+          logger.error("SerialTransport", "\u4E32\u53E3\u9519\u8BEF:", err);
+          this.isConnected = false;
+          this.emit("error", err);
+          reject(err);
+        });
+        this.port.on("close", () => {
+          logger.warn("SerialTransport", "\u4E32\u53E3\u8FDE\u63A5\u5173\u95ED");
+          this.isConnected = false;
+          this.scheduleReconnect();
+        });
+        this.parser.on("data", (data) => {
+          logger.debug("SerialTransport", "\u63A5\u6536\u6570\u636E:", data);
+          this.handleReceivedData(data);
+        });
+        this.port.open();
+      } catch (error) {
+        logger.error("SerialTransport", "\u521B\u5EFA\u4E32\u53E3\u8FDE\u63A5\u5931\u8D25:", error);
+        reject(error);
+      }
+    });
+  }
+  /**
+   * 断开串口连接
+   */
+  async disconnect() {
+    return new Promise((resolve) => {
+      if (this.port && this.isConnected) {
+        this.port.close(() => {
+          this.isConnected = false;
+          logger.info("SerialTransport", "\u4E32\u53E3\u8FDE\u63A5\u5DF2\u65AD\u5F00");
+          resolve();
+        });
+      } else {
+        resolve();
+      }
+    });
+  }
+  /**
+   * 处理接收到的数据
+   */
+  handleReceivedData(data) {
+    try {
+      const trimmedData = data.trim();
+      if (!trimmedData) {
+        return;
+      }
+      const responseCallback = (response) => {
+        this.send(response);
+      };
+      this.emit("data", trimmedData, responseCallback);
+    } catch (error) {
+      logger.error("SerialTransport", "\u5904\u7406\u63A5\u6536\u6570\u636E\u5931\u8D25:", error);
+      this.emit("error", error);
+    }
+  }
+  /**
+   * 安排重连
+   */
+  scheduleReconnect() {
+    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+      logger.error("SerialTransport", `\u91CD\u8FDE\u5931\u8D25\uFF0C\u5DF2\u8FBE\u5230\u6700\u5927\u91CD\u8FDE\u6B21\u6570: ${this.maxReconnectAttempts}`);
+      return;
+    }
+    if (this.reconnectTimer) {
+      return;
+    }
+    this.reconnectAttempts++;
+    logger.info("SerialTransport", `${this.reconnectInterval / 1e3}\u79D2\u540E\u5C1D\u8BD5\u91CD\u8FDE (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
+    this.reconnectTimer = setTimeout(async () => {
+      this.reconnectTimer = null;
+      try {
+        await this.connect();
+        logger.info("SerialTransport", "\u91CD\u8FDE\u6210\u529F");
+      } catch (error) {
+        logger.error("SerialTransport", "\u91CD\u8FDE\u5931\u8D25:", error);
+        this.scheduleReconnect();
+      }
+    }, this.reconnectInterval);
+  }
+  /**
+   * 获取连接状态
+   */
+  isConnectedStatus() {
+    return this.isConnected;
+  }
+  /**
+   * 获取配置信息
+   */
+  getConfig() {
+    return { ...this.config };
+  }
+};
+
 // src/index.ts
 var deviceManager = null;
 var transport = null;
@@ -947,111 +1144,120 @@ async function handleMessage(message, cb) {
 async function main() {
   const configManager2 = getConfigManager();
   const loggingConfig = configManager2.getLoggingConfig();
-  const logger = getLogger({
+  const logger2 = getLogger({
     level: parseLogLevel(loggingConfig.level),
     enableDevicePrefix: loggingConfig.enableDevicePrefix,
     enableTimestamp: true
   });
   const validation = configManager2.validate();
   if (!validation.valid) {
-    logger.error("Main", "\u914D\u7F6E\u9A8C\u8BC1\u5931\u8D25:");
-    validation.errors.forEach((error) => logger.error("Main", `  - ${error}`));
+    logger2.error("Main", "\u914D\u7F6E\u9A8C\u8BC1\u5931\u8D25:");
+    validation.errors.forEach((error) => logger2.error("Main", `  - ${error}`));
     process2.exit(1);
   }
   const deviceConfigs = configManager2.getDeviceConfigs();
   if (deviceConfigs.length === 0) {
-    logger.error("Main", "\u6CA1\u6709\u542F\u7528\u7684\u8BBE\u5907\u914D\u7F6E");
+    logger2.error("Main", "\u6CA1\u6709\u542F\u7528\u7684\u8BBE\u5907\u914D\u7F6E");
     process2.exit(1);
   }
-  logger.info("Main", `\u52A0\u8F7D\u4E86 ${deviceConfigs.length} \u4E2A\u8BBE\u5907\u914D\u7F6E:`);
+  logger2.info("Main", `\u52A0\u8F7D\u4E86 ${deviceConfigs.length} \u4E2A\u8BBE\u5907\u914D\u7F6E:`);
   deviceConfigs.forEach((device) => {
-    logger.info("Main", `  - ${device.deviceId}: ${device.serialPath}`);
+    logger2.info("Main", `  - ${device.deviceId}: ${device.serialPath}`);
   });
   deviceManager = new DeviceManager(deviceConfigs);
   const transportConfig = configManager2.getTransportConfig();
-  transport = new HttpTransport(transportConfig.port);
+  if (transportConfig.type === "http") {
+    transport = new HttpTransport(transportConfig.port);
+    logger2.info("Main", `\u4F7F\u7528 HTTP \u4F20\u8F93\u5C42\uFF0C\u7AEF\u53E3: ${transportConfig.port}`);
+  } else if (transportConfig.type === "serial") {
+    transport = new SerialTransport(transportConfig);
+    logger2.info("Main", `\u4F7F\u7528\u4E32\u53E3\u4F20\u8F93\u5C42\uFF0C\u7AEF\u53E3: ${transportConfig.serialPath}`);
+  } else {
+    logger2.error("Main", "\u4E0D\u652F\u6301\u7684\u4F20\u8F93\u5C42\u7C7B\u578B:", transportConfig.type);
+    process2.exit(1);
+  }
   transport.on("data", (message, cb) => {
     handleMessage(message, cb);
   });
   deviceManager.on("device", (device) => {
-    logger.info("Main", "\u8BBE\u5907\u4E0A\u62A5:", device);
+    logger2.info("Main", "\u8BBE\u5907\u4E0A\u62A5:", device);
     const event = createDeviceEvent(device);
     transport?.send(event);
   });
   deviceManager.on("deviceConnected", (info) => {
-    logger.info("Main", `\u8BBE\u5907 ${info.deviceId} (${info.serialPath}) \u8FDE\u63A5\u6210\u529F`);
+    logger2.info("Main", `\u8BBE\u5907 ${info.deviceId} (${info.serialPath}) \u8FDE\u63A5\u6210\u529F`);
   });
   deviceManager.on("deviceDisconnected", (info) => {
-    logger.warn("Main", `\u8BBE\u5907 ${info.deviceId} (${info.serialPath}) \u65AD\u5F00\u8FDE\u63A5`);
+    logger2.warn("Main", `\u8BBE\u5907 ${info.deviceId} (${info.serialPath}) \u65AD\u5F00\u8FDE\u63A5`);
   });
   deviceManager.on("deviceError", (error) => {
-    logger.error("Main", `\u8BBE\u5907 ${error.deviceId} (${error.serialPath}) \u53D1\u751F\u9519\u8BEF:`, error.error);
+    logger2.error("Main", `\u8BBE\u5907 ${error.deviceId} (${error.serialPath}) \u53D1\u751F\u9519\u8BEF:`, error.error);
   });
   try {
     await transport.start();
-    logger.info("Main", "\u4F20\u8F93\u5C42\u542F\u52A8\u6210\u529F");
+    logger2.info("Main", "\u4F20\u8F93\u5C42\u542F\u52A8\u6210\u529F");
     await deviceManager.initializeDevices();
     const stats = deviceManager.getConnectionStats();
-    logger.info("Main", `\u8BBE\u5907\u521D\u59CB\u5316\u5B8C\u6210: ${stats.connected}/${stats.total} \u4E2A\u8BBE\u5907\u8FDE\u63A5\u6210\u529F`);
+    logger2.info("Main", `\u8BBE\u5907\u521D\u59CB\u5316\u5B8C\u6210: ${stats.connected}/${stats.total} \u4E2A\u8BBE\u5907\u8FDE\u63A5\u6210\u529F`);
     if (stats.reconnecting > 0) {
-      logger.info("Main", `${stats.reconnecting} \u4E2A\u8BBE\u5907\u6B63\u5728\u91CD\u8FDE\u4E2D`);
+      logger2.info("Main", `${stats.reconnecting} \u4E2A\u8BBE\u5907\u6B63\u5728\u91CD\u8FDE\u4E2D`);
     }
     if (stats.connected === 0 && stats.reconnecting === 0) {
-      logger.error("Main", "\u6CA1\u6709\u8BBE\u5907\u8FDE\u63A5\u6210\u529F\uFF0C\u7A0B\u5E8F\u9000\u51FA");
+      logger2.error("Main", "\u6CA1\u6709\u8BBE\u5907\u8FDE\u63A5\u6210\u529F\uFF0C\u7A0B\u5E8F\u9000\u51FA");
       process2.exit(1);
     }
   } catch (error) {
-    logger.error("Main", "\u542F\u52A8\u5931\u8D25:", error);
+    logger2.error("Main", "\u542F\u52A8\u5931\u8D25:", error);
     process2.exit(1);
   }
 }
 function onReceiveHeartbeat() {
-  const logger = getLogger();
-  logger.debug("Main", "\u6536\u5230\u5FC3\u8DF3\u6307\u4EE4");
+  const logger2 = getLogger();
+  logger2.debug("Main", "\u6536\u5230\u5FC3\u8DF3\u6307\u4EE4");
   return createStatusResponse({
     run: true
   });
 }
 async function onReceiveStart(requestData) {
-  const logger = getLogger();
+  const logger2 = getLogger();
   const data = parseRequestData(requestData);
   const rssi = data?.rssi || "-60";
   const deviceId = data?.did;
-  logger.info("Main", "\u6536\u5230\u542F\u52A8\u626B\u63CF\u6307\u4EE4", { rssi, deviceId });
+  logger2.info("Main", "\u6536\u5230\u542F\u52A8\u626B\u63CF\u6307\u4EE4", { rssi, deviceId });
   try {
     await deviceManager?.startScan(rssi, deviceId);
     const message = deviceId ? `\u8BBE\u5907 ${deviceId} \u5F00\u59CB\u626B\u63CF` : "\u6240\u6709\u8BBE\u5907\u5F00\u59CB\u626B\u63CF";
-    logger.info("Main", message);
+    logger2.info("Main", message);
     return createStatusResponse({ msg: message });
   } catch (error) {
-    logger.error("Main", "\u542F\u52A8\u626B\u63CF\u5931\u8D25:", error);
+    logger2.error("Main", "\u542F\u52A8\u626B\u63CF\u5931\u8D25:", error);
     return createErrorResponse({ msg: error.message || "Failed to start scan" });
   }
 }
 async function onReceiveStop(requestData) {
-  const logger = getLogger();
+  const logger2 = getLogger();
   const data = parseRequestData(requestData);
   const deviceId = data?.did;
-  logger.info("Main", "\u6536\u5230\u505C\u6B62\u626B\u63CF\u6307\u4EE4", { deviceId });
+  logger2.info("Main", "\u6536\u5230\u505C\u6B62\u626B\u63CF\u6307\u4EE4", { deviceId });
   try {
     await deviceManager?.stopScan(deviceId);
     const message = deviceId ? `\u8BBE\u5907 ${deviceId} \u505C\u6B62\u626B\u63CF` : "\u6240\u6709\u8BBE\u5907\u505C\u6B62\u626B\u63CF";
-    logger.info("Main", message);
+    logger2.info("Main", message);
     return createStatusResponse({ msg: message });
   } catch (error) {
-    logger.error("Main", "\u505C\u6B62\u626B\u63CF\u5931\u8D25:", error);
+    logger2.error("Main", "\u505C\u6B62\u626B\u63CF\u5931\u8D25:", error);
     return createErrorResponse({ msg: error.message || "Failed to stop scan" });
   }
 }
 process2.on("SIGINT", async () => {
-  const logger = getLogger();
-  logger.info("Main", "\n\u6B63\u5728\u5173\u95ED\u7A0B\u5E8F...");
+  const logger2 = getLogger();
+  logger2.info("Main", "\n\u6B63\u5728\u5173\u95ED\u7A0B\u5E8F...");
   try {
     await deviceManager?.disconnectAll();
     await transport?.stop();
-    logger.info("Main", "\u7A0B\u5E8F\u5DF2\u5B89\u5168\u5173\u95ED");
+    logger2.info("Main", "\u7A0B\u5E8F\u5DF2\u5B89\u5168\u5173\u95ED");
   } catch (error) {
-    logger.error("Main", "\u5173\u95ED\u7A0B\u5E8F\u65F6\u53D1\u751F\u9519\u8BEF:", error);
+    logger2.error("Main", "\u5173\u95ED\u7A0B\u5E8F\u65F6\u53D1\u751F\u9519\u8BEF:", error);
   }
   process2.exit();
 });

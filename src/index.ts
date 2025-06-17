@@ -11,6 +11,7 @@ import { getConfigManager } from './config'
 import { DeviceManager } from './device-manager'
 import { HttpTransport } from './http-transport'
 import { getLogger, parseLogLevel } from './logger'
+import { SerialTransport } from './serial-transport'
 
 let deviceManager: DeviceManager | null = null
 let transport: ITransport | null = null
@@ -84,7 +85,19 @@ async function main() {
 
   // 根据配置创建传输层
   const transportConfig = configManager.getTransportConfig()
-  transport = new HttpTransport(transportConfig.port)
+
+  if (transportConfig.type === 'http') {
+    transport = new HttpTransport(transportConfig.port)
+    logger.info('Main', `使用 HTTP 传输层，端口: ${transportConfig.port}`)
+  }
+  else if (transportConfig.type === 'serial') {
+    transport = new SerialTransport(transportConfig)
+    logger.info('Main', `使用串口传输层，端口: ${transportConfig.serialPath}`)
+  }
+  else {
+    logger.error('Main', '不支持的传输层类型:', (transportConfig as any).type)
+    process.exit(1)
+  }
 
   // 监听来自传输层的指令
   transport.on('data', (message, cb) => {

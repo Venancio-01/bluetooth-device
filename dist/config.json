@@ -13,9 +13,19 @@
       "enabled": false
     }
   ],
-  "transport": {
+  "enabledTransports": "serial",
+  "httpTransport": {
     "type": "http",
     "port": 8888
+  },
+  "serialTransport": {
+    "type": "serial",
+    "serialPath": "/dev/ttyUSB2",
+    "baudRate": 115200,
+    "dataBits": 8,
+    "stopBits": 1,
+    "parity": "none",
+    "timeout": 5000
   },
   "logging": {
     "level": "info",
