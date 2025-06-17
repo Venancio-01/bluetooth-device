@@ -358,13 +358,6 @@ func (bd *BlueDevice) GetInitializeState() InitializeState {
 	return bd.initializeState
 }
 
-// startHeartbeat 启动心跳机制（带锁版本）
-func (bd *BlueDevice) startHeartbeat() {
-	bd.mutex.Lock()
-	defer bd.mutex.Unlock()
-	bd.startHeartbeatInternal()
-}
-
 // startHeartbeatInternal 启动心跳机制（内部方法，不加锁）
 func (bd *BlueDevice) startHeartbeatInternal() {
 	if bd.heartbeatTicker != nil {

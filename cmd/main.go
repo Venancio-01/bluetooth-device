@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -17,21 +16,16 @@ import (
 func handleMessage(blueDevice *bluetooth.BlueDevice, req *communication.Request) string {
 	if req == nil {
 		return communication.CreateErrorResponse(map[string]interface{}{
-			"msg": "Invalid message format", // msg 已经是缩写形式
+			"msg": "Invalid message format",
 		})
 	}
 
 	switch req.Command {
 	case communication.START:
-		rssi := "-50" // 默认值，根据协议文档修改为-50
+		rssi := "-50" // 默认值
 		if req.Data != nil {
-			// 支持字符串和数字类型的RSSI值
 			if rssiVal, ok := req.Data["rssi"].(string); ok && rssiVal != "" {
 				rssi = rssiVal
-			} else if rssiVal, ok := req.Data["rssi"].(float64); ok {
-				rssi = fmt.Sprintf("%.0f", rssiVal)
-			} else if rssiVal, ok := req.Data["rssi"].(int); ok {
-				rssi = fmt.Sprintf("%d", rssiVal)
 			}
 		}
 		log.Printf("收到启动扫描指令，RSSI: %s", rssi)
@@ -43,12 +37,10 @@ func handleMessage(blueDevice *bluetooth.BlueDevice, req *communication.Request)
 
 	default:
 		return communication.CreateErrorResponse(map[string]interface{}{
-			"msg": "Unknown command", // msg 已经是缩写形式
+			"msg": "Unknown command",
 		})
 	}
 }
-
-
 
 // onReceiveStart 处理启动扫描指令
 func onReceiveStart(blueDevice *bluetooth.BlueDevice, rssi string) string {
@@ -56,11 +48,11 @@ func onReceiveStart(blueDevice *bluetooth.BlueDevice, rssi string) string {
 	if err != nil {
 		log.Printf("启动扫描失败: %v", err)
 		return communication.CreateErrorResponse(map[string]interface{}{
-			"msg": err.Error(), // msg 已经是缩写形式
+			"msg": err.Error(),
 		})
 	}
 	return communication.CreateStatusResponse(map[string]interface{}{
-		"msg": "Scan started", // msg 已经是缩写形式
+		"msg": "Scan started",
 	})
 }
 
@@ -70,11 +62,11 @@ func onReceiveStop(blueDevice *bluetooth.BlueDevice) string {
 	if err != nil {
 		log.Printf("停止扫描失败: %v", err)
 		return communication.CreateErrorResponse(map[string]interface{}{
-			"msg": err.Error(), // msg 已经是缩写形式
+			"msg": err.Error(),
 		})
 	}
 	return communication.CreateStatusResponse(map[string]interface{}{
-		"msg": "Scan stopped", // msg 已经是缩写形式
+		"msg": "Scan stopped",
 	})
 }
 
@@ -94,7 +86,7 @@ func main() {
 
 	// 连接蓝牙设备
 	if err := blueDevice.Connect(); err != nil {
-		log.Fatalf("连接蓝牙设备失败: %v", err)	
+		log.Fatalf("连接蓝牙设备失败: %v", err)
 	} else {
 		log.Println("蓝牙模块连接成功")
 	}
