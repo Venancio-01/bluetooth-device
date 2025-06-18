@@ -1069,7 +1069,7 @@ var SerialTransport = class extends EventEmitter4 {
           this.scheduleReconnect();
         });
         this.port.on("data", (data) => {
-          logger.debug("SerialTransport", "\u63A5\u6536\u539F\u59CB\u6570\u636E:", data.toString("hex"));
+          logger.debug("SerialTransport", "\u63A5\u6536\u539F\u59CB\u6570\u636E:", data.toString("utf8"));
         });
         this.parser.on("data", (data) => {
           logger.debug("SerialTransport", "\u63A5\u6536\u89E3\u6790\u5206\u9694\u7B26\u540E\u7684\u6570\u636E:", data);

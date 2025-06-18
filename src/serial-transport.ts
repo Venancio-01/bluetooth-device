@@ -121,7 +121,7 @@ export class SerialTransport extends EventEmitter implements ITransport {
         })
 
         this.port.on('data', (data: Buffer) => {
-          logger.debug('SerialTransport', '接收原始数据:', data.toString('hex'))
+          logger.debug('SerialTransport', '接收原始数据:', data.toString('utf8'))
         })
 
         // 监听数据接收事件
