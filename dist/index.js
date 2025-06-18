@@ -1070,7 +1070,12 @@ var SerialTransport = class extends EventEmitter4 {
         });
         this.parser.on("data", (data) => {
           logger.debug("SerialTransport", "\u63A5\u6536\u6570\u636E:", data);
-          this.handleReceivedData(data);
+          try {
+            this.handleReceivedData(data);
+          } catch (error) {
+            logger.error("SerialTransport", "\u5904\u7406\u63A5\u6536\u6570\u636E\u5931\u8D25:", error);
+            this.emit("error", `\u5904\u7406\u63A5\u6536\u6570\u636E\u5931\u8D25: ${error instanceof Error ? error.message : String(error)}`);
+          }
         });
         this.port.open();
       } catch (error) {
@@ -1102,13 +1107,18 @@ var SerialTransport = class extends EventEmitter4 {
     const responseCallback = (response) => {
       this.send(response);
     };
-    const requestPayload = parseJSONMessage(data);
-    if (!requestPayload) {
-      logger.warn("SerialTransport", "\u63A5\u6536\u5230\u7684\u6570\u636E\u683C\u5F0F\u4E0D\u6B63\u786E:", data);
-      this.emit("error", `\u63A5\u6536\u5230\u7684\u6570\u636E\u683C\u5F0F\u4E0D\u6B63\u786E: ${data}`, responseCallback);
-      return;
+    try {
+      const requestPayload = parseJSONMessage(data);
+      if (!requestPayload) {
+        logger.warn("SerialTransport", "\u63A5\u6536\u5230\u7684\u6570\u636E\u683C\u5F0F\u4E0D\u6B63\u786E:", data);
+        this.emit("error", `\u63A5\u6536\u5230\u7684\u6570\u636E\u683C\u5F0F\u4E0D\u6B63\u786E: ${data}`, responseCallback);
+        return;
+      }
+      this.emit("data", requestPayload, responseCallback);
+    } catch (error) {
+      logger.error("SerialTransport", "\u5904\u7406\u63A5\u6536\u6570\u636E\u5931\u8D25:", error);
+      this.emit("error", `\u5904\u7406\u63A5\u6536\u6570\u636E\u5931\u8D25: ${error instanceof Error ? error.message : String(error)}`, responseCallback);
     }
-    this.emit("data", requestPayload, responseCallback);
   }
   /**
    * 安排重连

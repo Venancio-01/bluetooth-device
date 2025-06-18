@@ -122,7 +122,13 @@ export class SerialTransport extends EventEmitter implements ITransport {
         // 监听数据接收事件
         this.parser.on('data', (data: string) => {
           logger.debug('SerialTransport', '接收数据:', data)
-          this.handleReceivedData(data)
+          try {
+            this.handleReceivedData(data)
+          }
+          catch (error) {
+            logger.error('SerialTransport', '处理接收数据失败:', error)
+            this.emit('error', `处理接收数据失败: ${error instanceof Error ? error.message : String(error)}`)
+          }
         })
 
         // 打开串口
@@ -162,16 +168,22 @@ export class SerialTransport extends EventEmitter implements ITransport {
       this.send(response)
     }
 
-    const requestPayload = parseJSONMessage(data)
+    try {
+      const requestPayload = parseJSONMessage(data)
 
-    if (!requestPayload) {
-      logger.warn('SerialTransport', '接收到的数据格式不正确:', data)
-      this.emit('error', `接收到的数据格式不正确: ${data}`, responseCallback)
-      return
+      if (!requestPayload) {
+        logger.warn('SerialTransport', '接收到的数据格式不正确:', data)
+        this.emit('error', `接收到的数据格式不正确: ${data}`, responseCallback)
+        return
+      }
+
+      // 触发数据事件，传递给业务层处理
+      this.emit('data', requestPayload, responseCallback)
     }
-
-    // 触发数据事件，传递给业务层处理
-    this.emit('data', requestPayload, responseCallback)
+    catch (error) {
+      logger.error('SerialTransport', '处理接收数据失败:', error)
+      this.emit('error', `处理接收数据失败: ${error instanceof Error ? error.message : String(error)}`, responseCallback)
+    }
   }
 
   /**

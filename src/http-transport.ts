@@ -1,6 +1,6 @@
 import type { Server } from 'http'
-import type { ITransport, ResponseCallback } from './transport'
 import type { RequestPayload } from './communication'
+import type { ITransport, ResponseCallback } from './transport'
 import { EventEmitter } from 'events'
 import express from 'express'
 import { parseJSONMessage } from './communication'
