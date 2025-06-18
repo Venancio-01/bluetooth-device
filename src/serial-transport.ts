@@ -1,3 +1,4 @@
+import type { Buffer } from 'buffer'
 import type { SerialTransportConfig } from './config'
 import type { ITransport, ResponseCallback } from './transport'
 import { EventEmitter } from 'events'
@@ -119,9 +120,13 @@ export class SerialTransport extends EventEmitter implements ITransport {
           this.scheduleReconnect()
         })
 
+        this.port.on('data', (data: Buffer) => {
+          logger.debug('SerialTransport', '接收原始数据:', data.toString('hex'))
+        })
+
         // 监听数据接收事件
         this.parser.on('data', (data: string) => {
-          logger.debug('SerialTransport', '接收数据:', data)
+          logger.debug('SerialTransport', '接收解析分隔符后的数据:', data)
           try {
             this.handleReceivedData(data)
           }
