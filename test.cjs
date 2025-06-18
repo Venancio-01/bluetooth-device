@@ -23,6 +23,7 @@ function main() {
 
   setTimeout(() => {
     port.write('1234567890')
+    console.log('write')
   }, 5000)
 }
 
