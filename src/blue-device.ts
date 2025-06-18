@@ -1,8 +1,11 @@
 import { EventEmitter } from 'events'
 import { ReadlineParser } from '@serialport/parser-readline'
 import { SerialPort } from 'serialport'
+import { getLogger } from './logger'
 import { buildEnterCommandMode, buildObserverCommand, buildRestartCommand, buildSetRoleCommand, buildStopObserverCommand } from './protocol'
 import { sleep } from './utils'
+
+const logger = getLogger()
 
 // 厂商字典
 const MANUFACTURER_DICT = {
@@ -87,19 +90,19 @@ export class BlueDevice extends EventEmitter {
       })
 
       this.port.on('error', (err) => {
-        console.error(`[${this.deviceId}] 串口错误:`, err)
+        logger.error('BlueDevice', `[${this.deviceId}] 串口错误:`, err)
         this.emit('error', err)
         reject(err)
       })
 
       this.port.on('close', () => {
-        console.warn(`[${this.deviceId}] 串口连接关闭`)
+        logger.warn('BlueDevice', `[${this.deviceId}] 串口连接关闭`)
         this.emit('disconnected', { deviceId: this.deviceId, serialPath: this.serialPath })
         reject(new Error('串口关闭'))
       })
 
       parser.on('data', (data) => {
-        console.log(`[${this.deviceId}] 接收数据:`, data)
+        logger.debug('BlueDevice', `[${this.deviceId}] 接收数据:`, data)
         this.parseData(data)
       })
 
@@ -113,11 +116,11 @@ export class BlueDevice extends EventEmitter {
   }
 
   async send(data: string) {
-    console.log(`[${this.deviceId}] 发送数据:`, data)
+    logger.debug('BlueDevice', `[${this.deviceId}] 发送数据:`, data)
     return new Promise<void>((resolve, reject) => {
       if (!this.port) {
         const error = new Error('串口未连接')
-        console.error(`[${this.deviceId}] 发送数据失败:`, error.message)
+        logger.error('BlueDevice', `[${this.deviceId}] 发送数据失败:`, error.message)
         this.emit('error', error)
         reject(error)
         return
@@ -125,7 +128,7 @@ export class BlueDevice extends EventEmitter {
 
       this.port.write(data, (err) => {
         if (err) {
-          console.error(`[${this.deviceId}] 发送数据时出错:`, err.message)
+          logger.error('BlueDevice', `[${this.deviceId}] 发送数据时出错:`, err.message)
           this.emit('error', err)
           reject(err)
         }
@@ -153,7 +156,7 @@ export class BlueDevice extends EventEmitter {
         const hasDevice = this.deleteDeviceList.has(targetStr)
 
         if (!hasDevice) {
-          console.log(`[${this.deviceId}] manufacturer`, manufacturer)
+          logger.info('BlueDevice', `[${this.deviceId}] manufacturer`, manufacturer)
           this.emit('device', {
             mf: manufacturer,
           })
@@ -176,7 +179,7 @@ export class BlueDevice extends EventEmitter {
       }
     }
     catch (error) {
-      console.error(`[${this.deviceId}] 发送指令失败:`, error)
+      logger.error('BlueDevice', `[${this.deviceId}] 发送指令失败:`, error)
       throw error
     }
   }
@@ -186,7 +189,7 @@ export class BlueDevice extends EventEmitter {
       return
     }
 
-    console.log(`[${this.deviceId}] 开始初始化设备`)
+    logger.info('BlueDevice', `[${this.deviceId}] 开始初始化设备`)
     this.initializeState = 'initializing'
 
     try {
@@ -206,11 +209,11 @@ export class BlueDevice extends EventEmitter {
       await this.sendAndSleep(buildEnterCommandMode(), 500)
 
       this.initializeState = 'initialized'
-      console.log(`[${this.deviceId}] 设备初始化完成`)
+      logger.info('BlueDevice', `[${this.deviceId}] 设备初始化完成`)
     }
     catch (error) {
       this.initializeState = 'uninitialized'
-      console.error(`[${this.deviceId}] 设备初始化失败:`, error)
+      logger.error('BlueDevice', `[${this.deviceId}] 设备初始化失败:`, error)
       this.emit('error', error)
       throw error
     }
@@ -223,26 +226,26 @@ export class BlueDevice extends EventEmitter {
       }
 
       if (this.initializeState === 'initializing') {
-        console.log(`[${this.deviceId}] 设备初始化中，请稍后再试`)
+        logger.error('BlueDevice', `[${this.deviceId}] 设备初始化中，请稍后再试`)
         throw new Error('设备初始化中')
       }
 
       if (this.isScanning) {
-        console.log(`[${this.deviceId}] 设备已在扫描中`)
+        logger.info('BlueDevice', `[${this.deviceId}] 设备已在扫描中`)
         return
       }
 
-      console.log(`[${this.deviceId}] 开始扫描，RSSI阈值: ${rssi}`)
+      logger.info('BlueDevice', `[${this.deviceId}] 开始扫描，RSSI阈值: ${rssi}`)
       this.deleteDeviceList.clear()
       this.isScanning = true
 
       // 设置设备为观察者模式
       await this.sendAndSleep(buildObserverCommand(rssi))
-      console.log(`[${this.deviceId}] 扫描已启动`)
+      logger.info('BlueDevice', `[${this.deviceId}] 扫描已启动`)
     }
     catch (error) {
       this.isScanning = false
-      console.error(`[${this.deviceId}] 启动扫描失败:`, error)
+      logger.error('BlueDevice', `[${this.deviceId}] 启动扫描失败:`, error)
       this.emit('error', error)
       throw error
     }
@@ -251,18 +254,18 @@ export class BlueDevice extends EventEmitter {
   async stopScan() {
     try {
       if (!this.isScanning) {
-        console.log(`[${this.deviceId}] 设备未在扫描中`)
+        logger.info('BlueDevice', `[${this.deviceId}] 设备未在扫描中`)
         return
       }
 
-      console.log(`[${this.deviceId}] 停止扫描`)
+      logger.info('BlueDevice', `[${this.deviceId}] 停止扫描`)
       // 停止扫描
       await this.sendAndSleep(buildStopObserverCommand())
       this.isScanning = false
-      console.log(`[${this.deviceId}] 扫描已停止`)
+      logger.info('BlueDevice', `[${this.deviceId}] 扫描已停止`)
     }
     catch (error) {
-      console.error(`[${this.deviceId}] 停止扫描失败:`, error)
+      logger.error('BlueDevice', `[${this.deviceId}] 停止扫描失败:`, error)
       this.emit('error', error)
       throw error
     }

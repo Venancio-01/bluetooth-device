@@ -1,4 +1,7 @@
 import { z } from 'zod'
+import { getLogger } from './logger'
+
+const logger = getLogger()
 
 // 1. 编码字典
 
@@ -103,11 +106,11 @@ export function parseJSONMessage(message: string): RequestPayload | null {
     if (validation.success) {
       return validation.data
     }
-    console.error('Invalid message format:', validation.error)
+    logger.error('parseJSONMessage', 'Invalid message format:', validation.error)
     return null
   }
   catch (error) {
-    console.error('Failed to parse JSON message:', error)
+    logger.error('parseJSONMessage', 'Failed to parse JSON message:', error)
     return null
   }
 }
@@ -123,11 +126,11 @@ export function parseRequestData(data: unknown): RequestData | null {
     if (validation.success) {
       return validation.data
     }
-    console.error('Invalid request data format:', validation.error)
+    logger.error('parseRequestData', 'Invalid request data format:', validation.error)
     return null
   }
   catch (error) {
-    console.error('Failed to parse request data:', error)
+    logger.error('parseRequestData', 'Failed to parse request data:', error)
     return null
   }
 }
