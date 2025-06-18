@@ -255,7 +255,6 @@ var ConfigManager = class {
     if (process.env["CONFIG_PATH"]) {
       return process.env["CONFIG_PATH"];
     }
-    console.log('path.join(process.cwd(), "config.json")', path.join(process.cwd(), "config.json"));
     return path.join(process.cwd(), "config.json");
   }
   /**
