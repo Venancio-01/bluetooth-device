@@ -1,0 +1,11 @@
+[Unit]
+Description=Node.js Service for bluetooth-device
+After=network.target
+
+[Service]
+ExecStart=/home/orangepi/.local/share/fnm/aliases/default/bin/node /home/orangepi/smart-cabinet/bluetooth-device/dist/index.js
+User=orangepi
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
