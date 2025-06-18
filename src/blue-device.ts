@@ -26,12 +26,15 @@ export class BlueDevice extends EventEmitter {
   private deleteDeviceList: Set<string> = new Set()
   private readonly serialPath: string
   private readonly deviceId: string
+  private readonly reportInterval: number
+  private reportTimer: NodeJS.Timeout | null = null
 
-  constructor(serialPath: string = '/dev/ttyUSB0', deviceId?: string) {
+  constructor(serialPath: string = '/dev/ttyUSB0', deviceId?: string, reportInterval: number = 5000) {
     super()
     this.port = null
     this.serialPath = serialPath
     this.deviceId = deviceId || serialPath.replace(/[^a-z0-9]/gi, '_')
+    this.reportInterval = reportInterval
   }
 
   /**
@@ -219,7 +222,7 @@ export class BlueDevice extends EventEmitter {
     }
   }
 
-  async startScan(rssi = '-60') {
+  async startScan(rssi = '-50') {
     try {
       if (this.initializeState === 'uninitialized') {
         await this.initialize()
@@ -236,8 +239,9 @@ export class BlueDevice extends EventEmitter {
       }
 
       logger.info('BlueDevice', `[${this.deviceId}] 开始扫描，RSSI阈值: ${rssi}`)
-      this.deleteDeviceList.clear()
       this.isScanning = true
+      // 启动定时清除已检测设备
+      this.startReportTimer()
 
       // 设置设备为观察者模式
       await this.sendAndSleep(buildObserverCommand(rssi))
@@ -263,6 +267,8 @@ export class BlueDevice extends EventEmitter {
       await this.sendAndSleep(buildStopObserverCommand())
       this.isScanning = false
       logger.info('BlueDevice', `[${this.deviceId}] 扫描已停止`)
+      // 停止定时清除已检测设备
+      this.stopReportTimer()
     }
     catch (error) {
       logger.error('BlueDevice', `[${this.deviceId}] 停止扫描失败:`, error)
@@ -276,5 +282,21 @@ export class BlueDevice extends EventEmitter {
    */
   async restart() {
     await this.sendAndSleep(buildRestartCommand())
+  }
+
+  // 启动定时清除已检测设备
+  private startReportTimer() {
+    this.deleteDeviceList.clear()
+    this.reportTimer = setInterval(() => {
+      this.deleteDeviceList.clear()
+    }, this.reportInterval)
+  }
+
+  // 停止定时清除已检测设备
+  private stopReportTimer() {
+    if (this.reportTimer) {
+      clearInterval(this.reportTimer)
+      this.reportTimer = null
+    }
   }
 }

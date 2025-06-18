@@ -1,3 +1,5 @@
+import { getFormattedDateTimeWithMilliseconds } from './utils'
+
 export enum LogLevel {
   DEBUG = 0,
   INFO = 1,
@@ -26,7 +28,7 @@ export class Logger {
     const parts: string[] = []
 
     if (this.config.enableTimestamp) {
-      parts.push(new Date().toISOString())
+      parts.push(getFormattedDateTimeWithMilliseconds())
     }
 
     parts.push(`[${level}]`)

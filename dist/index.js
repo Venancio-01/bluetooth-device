@@ -1,8 +1,30 @@
 // src/index.ts
 import process2 from "process";
 
-// src/communication.ts
+// src/app-controller.ts
+import { EventEmitter as EventEmitter5 } from "events";
+
+// src/config.ts
+import fs from "fs";
+import path from "path";
+import process from "process";
 import { z } from "zod";
+
+// src/utils.ts
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+function getFormattedDateTimeWithMilliseconds() {
+  const now = /* @__PURE__ */ new Date();
+  const year = now.getFullYear();
+  const month = (now.getMonth() + 1).toString().padStart(2, "0");
+  const day = now.getDate().toString().padStart(2, "0");
+  const hours = now.getHours().toString().padStart(2, "0");
+  const minutes = now.getMinutes().toString().padStart(2, "0");
+  const seconds = now.getSeconds().toString().padStart(2, "0");
+  const milliseconds = now.getMilliseconds().toString().padStart(3, "0");
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}.${milliseconds}`;
+}
 
 // src/logger.ts
 var Logger = class {
@@ -17,7 +39,7 @@ var Logger = class {
   formatMessage(level, component, message) {
     const parts = [];
     if (this.config.enableTimestamp) {
-      parts.push((/* @__PURE__ */ new Date()).toISOString());
+      parts.push(getFormattedDateTimeWithMilliseconds());
     }
     parts.push(`[${level}]`);
     if (component) {
@@ -96,121 +118,37 @@ function parseLogLevel(level) {
   }
 }
 
-// src/communication.ts
-var logger2 = getLogger();
-var CommandCode = {
-  START: 1,
-  STOP: 2
-};
-var EventTypeCode = {
-  STATUS: 1,
-  ERROR: 2,
-  DEVICE: 3,
-  HEARTBEAT: 4
-};
-var RequestSchema = z.object({
-  c: z.nativeEnum(CommandCode),
-  d: z.record(z.unknown()).optional()
-});
-var RequestDataSchema = z.object({
-  rssi: z.string().optional()
-}).passthrough();
-var ResponseSchema = z.object({
-  t: z.nativeEnum(EventTypeCode),
-  d: z.record(z.unknown())
-});
-function createStatusResponse(data) {
-  const payload = {
-    t: EventTypeCode.STATUS,
-    d: data
-  };
-  return JSON.stringify(payload);
-}
-function createErrorResponse(message) {
-  const payload = {
-    t: EventTypeCode.ERROR,
-    d: {
-      msg: message
-    }
-  };
-  return JSON.stringify(payload);
-}
-function createDeviceEvent(data) {
-  const payload = {
-    t: EventTypeCode.DEVICE,
-    d: data
-  };
-  return JSON.stringify(payload);
-}
-function createHeartbeatEvent(data) {
-  const payload = {
-    t: EventTypeCode.HEARTBEAT,
-    d: data
-  };
-  return JSON.stringify(payload);
-}
-function parseJSONMessage(message) {
-  try {
-    const json = JSON.parse(message);
-    const validation = RequestSchema.safeParse(json);
-    if (validation.success) {
-      return validation.data;
-    }
-    logger2.error("parseJSONMessage", "Invalid message format:", validation.error);
-    return null;
-  } catch (error) {
-    logger2.error("parseJSONMessage", "Failed to parse JSON message:", error);
-    return null;
-  }
-}
-function parseRequestData(data) {
-  try {
-    const validation = RequestDataSchema.safeParse(data);
-    if (validation.success) {
-      return validation.data;
-    }
-    logger2.error("parseRequestData", "Invalid request data format:", validation.error);
-    return null;
-  } catch (error) {
-    logger2.error("parseRequestData", "Failed to parse request data:", error);
-    return null;
-  }
-}
-
 // src/config.ts
-import fs from "fs";
-import path from "path";
-import process from "process";
-import { z as z2 } from "zod";
-var logger3 = getLogger();
-var DeviceConfigSchema = z2.object({
-  serialPath: z2.string(),
-  deviceId: z2.string().optional(),
-  baudRate: z2.number().optional().default(115200),
-  enabled: z2.boolean().optional().default(true)
+var logger = getLogger();
+var DeviceConfigSchema = z.object({
+  serialPath: z.string(),
+  deviceId: z.string().optional(),
+  baudRate: z.number().optional().default(115200),
+  enabled: z.boolean().optional().default(true)
 });
-var HttpTransportConfigSchema = z2.object({
-  type: z2.literal("http"),
-  port: z2.number().optional().default(8888)
+var HttpTransportConfigSchema = z.object({
+  type: z.literal("http"),
+  port: z.number().optional().default(8888)
 });
-var SerialTransportConfigSchema = z2.object({
-  type: z2.literal("serial"),
-  serialPath: z2.string(),
-  baudRate: z2.number().optional().default(115200),
-  dataBits: z2.number().optional().default(8),
-  stopBits: z2.number().optional().default(1),
-  parity: z2.enum(["none", "even", "odd"]).optional().default("none"),
-  timeout: z2.number().optional().default(5e3)
+var SerialTransportConfigSchema = z.object({
+  type: z.literal("serial"),
+  serialPath: z.string(),
+  baudRate: z.number().optional().default(115200),
+  dataBits: z.number().optional().default(8),
+  stopBits: z.number().optional().default(1),
+  parity: z.enum(["none", "even", "odd"]).optional().default("none"),
+  timeout: z.number().optional().default(5e3)
   // 超时时间（毫秒）
 });
-var AppConfigSchema = z2.object({
-  devices: z2.array(DeviceConfigSchema),
-  enabledTransports: z2.enum(["http", "serial"]).optional().default("http"),
+var AppConfigSchema = z.object({
+  devices: z.array(DeviceConfigSchema),
+  enabledTransports: z.enum(["http", "serial"]).optional().default("http"),
+  reportInterval: z.number().optional().default(5e3),
   httpTransport: HttpTransportConfigSchema.optional().default({ type: "http", port: 8888 }),
   serialTransport: SerialTransportConfigSchema.optional().default({ type: "serial", serialPath: "/dev/ttyUSB0", baudRate: 115200, dataBits: 8, stopBits: 1, parity: "none", timeout: 5e3 }),
-  logging: z2.object({
-    level: z2.enum(["debug", "info", "warn", "error"]).optional().default("info"),
-    enableDevicePrefix: z2.boolean().optional().default(true)
+  logging: z.object({
+    level: z.enum(["debug", "info", "warn", "error"]).optional().default("info"),
+    enableDevicePrefix: z.boolean().optional().default(true)
   }).optional().default({ level: "info", enableDevicePrefix: true })
 });
 var DEFAULT_CONFIG = {
@@ -222,6 +160,7 @@ var DEFAULT_CONFIG = {
       enabled: true
     }
   ],
+  reportInterval: 5e3,
   enabledTransports: "http",
   httpTransport: {
     type: "http",
@@ -266,14 +205,14 @@ var ConfigManager = class {
         const configContent = fs.readFileSync(this.configPath, "utf-8");
         const jsonConfig = JSON.parse(configContent);
         const validatedConfig = AppConfigSchema.parse(jsonConfig);
-        logger3.info("ConfigManager", `\u4ECE\u914D\u7F6E\u6587\u4EF6\u52A0\u8F7D\u914D\u7F6E: ${this.configPath}`);
+        logger.info("ConfigManager", `\u4ECE\u914D\u7F6E\u6587\u4EF6\u52A0\u8F7D\u914D\u7F6E: ${this.configPath}`);
         return validatedConfig;
       }
-      logger3.info("ConfigManager", "\u672A\u627E\u5230\u914D\u7F6E\u6587\u4EF6\uFF0C\u521B\u5EFA\u9ED8\u8BA4\u914D\u7F6E");
+      logger.info("ConfigManager", "\u672A\u627E\u5230\u914D\u7F6E\u6587\u4EF6\uFF0C\u521B\u5EFA\u9ED8\u8BA4\u914D\u7F6E");
       this.saveConfig(DEFAULT_CONFIG);
       return DEFAULT_CONFIG;
     } catch (error) {
-      logger3.error("ConfigManager", "\u52A0\u8F7D\u914D\u7F6E\u5931\u8D25\uFF0C\u4F7F\u7528\u9ED8\u8BA4\u914D\u7F6E:", error);
+      logger.error("ConfigManager", "\u52A0\u8F7D\u914D\u7F6E\u5931\u8D25\uFF0C\u4F7F\u7528\u9ED8\u8BA4\u914D\u7F6E:", error);
       return DEFAULT_CONFIG;
     }
   }
@@ -284,9 +223,9 @@ var ConfigManager = class {
     try {
       const configContent = JSON.stringify(config, null, 2);
       fs.writeFileSync(this.configPath, configContent, "utf-8");
-      logger3.info("ConfigManager", `\u914D\u7F6E\u5DF2\u4FDD\u5B58\u5230: ${this.configPath}`);
+      logger.info("ConfigManager", `\u914D\u7F6E\u5DF2\u4FDD\u5B58\u5230: ${this.configPath}`);
     } catch (error) {
-      logger3.error("ConfigManager", "\u4FDD\u5B58\u914D\u7F6E\u5931\u8D25:", error);
+      logger.error("ConfigManager", "\u4FDD\u5B58\u914D\u7F6E\u5931\u8D25:", error);
     }
   }
   /**
@@ -418,13 +357,8 @@ function buildStopObserverCommand() {
   return `${AT_COMMAND_PREFIX}+${AT_STOP_OBSERVER}${AT_COMMAND_SUFFIX}`;
 }
 
-// src/utils.ts
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 // src/blue-device.ts
-var logger4 = getLogger();
+var logger2 = getLogger();
 var MANUFACTURER_DICT = {
   "0001": "Nokia Mobile Phones",
   // '0006': 'Microsoft',
@@ -442,11 +376,14 @@ var BlueDevice = class extends EventEmitter {
   deleteDeviceList = /* @__PURE__ */ new Set();
   serialPath;
   deviceId;
-  constructor(serialPath = "/dev/ttyUSB0", deviceId) {
+  reportInterval;
+  reportTimer = null;
+  constructor(serialPath = "/dev/ttyUSB0", deviceId, reportInterval = 5e3) {
     super();
     this.port = null;
     this.serialPath = serialPath;
     this.deviceId = deviceId || serialPath.replace(/[^a-z0-9]/gi, "_");
+    this.reportInterval = reportInterval;
   }
   /**
    * 获取设备ID
@@ -497,17 +434,17 @@ var BlueDevice = class extends EventEmitter {
         resolve(this.port);
       });
       this.port.on("error", (err) => {
-        logger4.error("BlueDevice", `[${this.deviceId}] \u4E32\u53E3\u9519\u8BEF:`, err);
+        logger2.error("BlueDevice", `[${this.deviceId}] \u4E32\u53E3\u9519\u8BEF:`, err);
         this.emit("error", err);
         reject(err);
       });
       this.port.on("close", () => {
-        logger4.warn("BlueDevice", `[${this.deviceId}] \u4E32\u53E3\u8FDE\u63A5\u5173\u95ED`);
+        logger2.warn("BlueDevice", `[${this.deviceId}] \u4E32\u53E3\u8FDE\u63A5\u5173\u95ED`);
         this.emit("disconnected", { deviceId: this.deviceId, serialPath: this.serialPath });
         reject(new Error("\u4E32\u53E3\u5173\u95ED"));
       });
       parser.on("data", (data) => {
-        logger4.debug("BlueDevice", `[${this.deviceId}] \u63A5\u6536\u6570\u636E:`, data);
+        logger2.debug("BlueDevice", `[${this.deviceId}] \u63A5\u6536\u6570\u636E:`, data);
         this.parseData(data);
       });
       this.port.open();
@@ -518,18 +455,18 @@ var BlueDevice = class extends EventEmitter {
     this.port?.close();
   }
   async send(data) {
-    logger4.debug("BlueDevice", `[${this.deviceId}] \u53D1\u9001\u6570\u636E:`, data);
+    logger2.debug("BlueDevice", `[${this.deviceId}] \u53D1\u9001\u6570\u636E:`, data);
     return new Promise((resolve, reject) => {
       if (!this.port) {
         const error = new Error("\u4E32\u53E3\u672A\u8FDE\u63A5");
-        logger4.error("BlueDevice", `[${this.deviceId}] \u53D1\u9001\u6570\u636E\u5931\u8D25:`, error.message);
+        logger2.error("BlueDevice", `[${this.deviceId}] \u53D1\u9001\u6570\u636E\u5931\u8D25:`, error.message);
         this.emit("error", error);
         reject(error);
         return;
       }
       this.port.write(data, (err) => {
         if (err) {
-          logger4.error("BlueDevice", `[${this.deviceId}] \u53D1\u9001\u6570\u636E\u65F6\u51FA\u9519:`, err.message);
+          logger2.error("BlueDevice", `[${this.deviceId}] \u53D1\u9001\u6570\u636E\u65F6\u51FA\u9519:`, err.message);
           this.emit("error", err);
           reject(err);
         } else {
@@ -551,7 +488,7 @@ var BlueDevice = class extends EventEmitter {
       if (manufacturer) {
         const hasDevice = this.deleteDeviceList.has(targetStr);
         if (!hasDevice) {
-          logger4.info("BlueDevice", `[${this.deviceId}] manufacturer`, manufacturer);
+          logger2.info("BlueDevice", `[${this.deviceId}] manufacturer`, manufacturer);
           this.emit("device", {
             mf: manufacturer
           });
@@ -572,7 +509,7 @@ var BlueDevice = class extends EventEmitter {
         await sleep(sleepTime);
       }
     } catch (error) {
-      logger4.error("BlueDevice", `[${this.deviceId}] \u53D1\u9001\u6307\u4EE4\u5931\u8D25:`, error);
+      logger2.error("BlueDevice", `[${this.deviceId}] \u53D1\u9001\u6307\u4EE4\u5931\u8D25:`, error);
       throw error;
     }
   }
@@ -580,7 +517,7 @@ var BlueDevice = class extends EventEmitter {
     if (this.initializeState === "initializing" || this.initializeState === "initialized") {
       return;
     }
-    logger4.info("BlueDevice", `[${this.deviceId}] \u5F00\u59CB\u521D\u59CB\u5316\u8BBE\u5907`);
+    logger2.info("BlueDevice", `[${this.deviceId}] \u5F00\u59CB\u521D\u59CB\u5316\u8BBE\u5907`);
     this.initializeState = "initializing";
     try {
       await this.sendAndSleep(buildRestartCommand(), 3e3);
@@ -589,35 +526,35 @@ var BlueDevice = class extends EventEmitter {
       await this.sendAndSleep(buildRestartCommand(), 2e3);
       await this.sendAndSleep(buildEnterCommandMode(), 500);
       this.initializeState = "initialized";
-      logger4.info("BlueDevice", `[${this.deviceId}] \u8BBE\u5907\u521D\u59CB\u5316\u5B8C\u6210`);
+      logger2.info("BlueDevice", `[${this.deviceId}] \u8BBE\u5907\u521D\u59CB\u5316\u5B8C\u6210`);
     } catch (error) {
       this.initializeState = "uninitialized";
-      logger4.error("BlueDevice", `[${this.deviceId}] \u8BBE\u5907\u521D\u59CB\u5316\u5931\u8D25:`, error);
+      logger2.error("BlueDevice", `[${this.deviceId}] \u8BBE\u5907\u521D\u59CB\u5316\u5931\u8D25:`, error);
       this.emit("error", error);
       throw error;
     }
   }
-  async startScan(rssi = "-60") {
+  async startScan(rssi = "-50") {
     try {
       if (this.initializeState === "uninitialized") {
         await this.initialize();
       }
       if (this.initializeState === "initializing") {
-        logger4.error("BlueDevice", `[${this.deviceId}] \u8BBE\u5907\u521D\u59CB\u5316\u4E2D\uFF0C\u8BF7\u7A0D\u540E\u518D\u8BD5`);
+        logger2.error("BlueDevice", `[${this.deviceId}] \u8BBE\u5907\u521D\u59CB\u5316\u4E2D\uFF0C\u8BF7\u7A0D\u540E\u518D\u8BD5`);
         throw new Error("\u8BBE\u5907\u521D\u59CB\u5316\u4E2D");
       }
       if (this.isScanning) {
-        logger4.info("BlueDevice", `[${this.deviceId}] \u8BBE\u5907\u5DF2\u5728\u626B\u63CF\u4E2D`);
+        logger2.info("BlueDevice", `[${this.deviceId}] \u8BBE\u5907\u5DF2\u5728\u626B\u63CF\u4E2D`);
         return;
       }
-      logger4.info("BlueDevice", `[${this.deviceId}] \u5F00\u59CB\u626B\u63CF\uFF0CRSSI\u9608\u503C: ${rssi}`);
-      this.deleteDeviceList.clear();
+      logger2.info("BlueDevice", `[${this.deviceId}] \u5F00\u59CB\u626B\u63CF\uFF0CRSSI\u9608\u503C: ${rssi}`);
       this.isScanning = true;
+      this.startReportTimer();
       await this.sendAndSleep(buildObserverCommand(rssi));
-      logger4.info("BlueDevice", `[${this.deviceId}] \u626B\u63CF\u5DF2\u542F\u52A8`);
+      logger2.info("BlueDevice", `[${this.deviceId}] \u626B\u63CF\u5DF2\u542F\u52A8`);
     } catch (error) {
       this.isScanning = false;
-      logger4.error("BlueDevice", `[${this.deviceId}] \u542F\u52A8\u626B\u63CF\u5931\u8D25:`, error);
+      logger2.error("BlueDevice", `[${this.deviceId}] \u542F\u52A8\u626B\u63CF\u5931\u8D25:`, error);
       this.emit("error", error);
       throw error;
     }
@@ -625,15 +562,16 @@ var BlueDevice = class extends EventEmitter {
   async stopScan() {
     try {
       if (!this.isScanning) {
-        logger4.info("BlueDevice", `[${this.deviceId}] \u8BBE\u5907\u672A\u5728\u626B\u63CF\u4E2D`);
+        logger2.info("BlueDevice", `[${this.deviceId}] \u8BBE\u5907\u672A\u5728\u626B\u63CF\u4E2D`);
         return;
       }
-      logger4.info("BlueDevice", `[${this.deviceId}] \u505C\u6B62\u626B\u63CF`);
+      logger2.info("BlueDevice", `[${this.deviceId}] \u505C\u6B62\u626B\u63CF`);
       await this.sendAndSleep(buildStopObserverCommand());
       this.isScanning = false;
-      logger4.info("BlueDevice", `[${this.deviceId}] \u626B\u63CF\u5DF2\u505C\u6B62`);
+      logger2.info("BlueDevice", `[${this.deviceId}] \u626B\u63CF\u5DF2\u505C\u6B62`);
+      this.stopReportTimer();
     } catch (error) {
-      logger4.error("BlueDevice", `[${this.deviceId}] \u505C\u6B62\u626B\u63CF\u5931\u8D25:`, error);
+      logger2.error("BlueDevice", `[${this.deviceId}] \u505C\u6B62\u626B\u63CF\u5931\u8D25:`, error);
       this.emit("error", error);
       throw error;
     }
@@ -644,10 +582,24 @@ var BlueDevice = class extends EventEmitter {
   async restart() {
     await this.sendAndSleep(buildRestartCommand());
   }
+  // 启动定时清除已检测设备
+  startReportTimer() {
+    this.deleteDeviceList.clear();
+    this.reportTimer = setInterval(() => {
+      this.deleteDeviceList.clear();
+    }, this.reportInterval);
+  }
+  // 停止定时清除已检测设备
+  stopReportTimer() {
+    if (this.reportTimer) {
+      clearInterval(this.reportTimer);
+      this.reportTimer = null;
+    }
+  }
 };
 
 // src/device-manager.ts
-var logger5 = getLogger();
+var logger3 = getLogger();
 var DeviceManager = class extends EventEmitter2 {
   devices = /* @__PURE__ */ new Map();
   deviceConfigs = [];
@@ -681,7 +633,7 @@ var DeviceManager = class extends EventEmitter2 {
     results.forEach((result, index) => {
       if (result.status === "rejected") {
         const config = this.deviceConfigs[index];
-        logger5.error("DeviceManager", `[${config?.deviceId || config?.serialPath}] \u521D\u59CB\u5316\u5931\u8D25:`, result.reason);
+        logger3.error("DeviceManager", `[${config?.deviceId || config?.serialPath}] \u521D\u59CB\u5316\u5931\u8D25:`, result.reason);
       }
     });
   }
@@ -692,11 +644,11 @@ var DeviceManager = class extends EventEmitter2 {
     const device = new BlueDevice(config.serialPath, config.deviceId);
     const deviceId = device.getDeviceId();
     device.on("device", (deviceData) => {
-      logger5.info("DeviceManager", `[${deviceId}] \u4E0A\u62A5:`, deviceData);
+      logger3.info("DeviceManager", `[${deviceId}] \u4E0A\u62A5:`, deviceData);
       this.emit("device", deviceData);
     });
     device.on("error", (error) => {
-      logger5.error("DeviceManager", `[${deviceId}] \u9519\u8BEF:`, error);
+      logger3.error("DeviceManager", `[${deviceId}] \u9519\u8BEF:`, error);
       this.emit("deviceError", {
         deviceId,
         serialPath: device.getSerialPath(),
@@ -704,7 +656,7 @@ var DeviceManager = class extends EventEmitter2 {
       });
     });
     device.on("disconnected", () => {
-      logger5.warn("DeviceManager", `[${deviceId}] \u65AD\u5F00\u8FDE\u63A5`);
+      logger3.warn("DeviceManager", `[${deviceId}] \u65AD\u5F00\u8FDE\u63A5`);
       this.devices.delete(deviceId);
       this.emit("deviceDisconnected", {
         deviceId,
@@ -714,16 +666,16 @@ var DeviceManager = class extends EventEmitter2 {
     });
     try {
       await device.connect();
-      logger5.info("DeviceManager", `[${deviceId}] \u8FDE\u63A5\u6210\u529F`);
+      logger3.info("DeviceManager", `[${deviceId}] \u8FDE\u63A5\u6210\u529F`);
       await device.initialize();
-      logger5.info("DeviceManager", `[${deviceId}] \u521D\u59CB\u5316\u5B8C\u6210`);
+      logger3.info("DeviceManager", `[${deviceId}] \u521D\u59CB\u5316\u5B8C\u6210`);
       this.devices.set(deviceId, device);
       this.emit("deviceConnected", {
         deviceId,
         serialPath: device.getSerialPath()
       });
     } catch (error) {
-      logger5.error("DeviceManager", `[${deviceId}] \u8FDE\u63A5\u6216\u521D\u59CB\u5316\u5931\u8D25:`, error);
+      logger3.error("DeviceManager", `[${deviceId}] \u8FDE\u63A5\u6216\u521D\u59CB\u5316\u5931\u8D25:`, error);
       throw error;
     }
   }
@@ -764,14 +716,14 @@ var DeviceManager = class extends EventEmitter2 {
         throw new Error(`\u8BBE\u5907 ${deviceId} \u4E0D\u5B58\u5728`);
       }
       await device.startScan(rssi);
-      logger5.info("DeviceManager", `[${deviceId}] \u5F00\u59CB\u626B\u63CF`);
+      logger3.info("DeviceManager", `[${deviceId}] \u5F00\u59CB\u626B\u63CF`);
     } else {
       const startPromises = Array.from(this.devices.entries()).map(async ([id, device]) => {
         try {
           await device.startScan(rssi);
-          logger5.info("DeviceManager", `[${id}] \u5F00\u59CB\u626B\u63CF`);
+          logger3.info("DeviceManager", `[${id}] \u5F00\u59CB\u626B\u63CF`);
         } catch (error) {
-          logger5.error("DeviceManager", `[${id}] \u542F\u52A8\u626B\u63CF\u5931\u8D25:`, error);
+          logger3.error("DeviceManager", `[${id}] \u542F\u52A8\u626B\u63CF\u5931\u8D25:`, error);
         }
       });
       await Promise.allSettled(startPromises);
@@ -787,14 +739,14 @@ var DeviceManager = class extends EventEmitter2 {
         throw new Error(`\u8BBE\u5907 ${deviceId} \u4E0D\u5B58\u5728`);
       }
       await device.stopScan();
-      logger5.info("DeviceManager", `[${deviceId}] \u505C\u6B62\u626B\u63CF`);
+      logger3.info("DeviceManager", `[${deviceId}] \u505C\u6B62\u626B\u63CF`);
     } else {
       const stopPromises = Array.from(this.devices.entries()).map(async ([id, device]) => {
         try {
           await device.stopScan();
-          logger5.info("DeviceManager", `[${id}] \u505C\u6B62\u626B\u63CF`);
+          logger3.info("DeviceManager", `[${id}] \u505C\u6B62\u626B\u63CF`);
         } catch (error) {
-          logger5.error("DeviceManager", `[${id}] \u505C\u6B62\u626B\u63CF\u5931\u8D25:`, error);
+          logger3.error("DeviceManager", `[${id}] \u505C\u6B62\u626B\u63CF\u5931\u8D25:`, error);
         }
       });
       await Promise.allSettled(stopPromises);
@@ -808,9 +760,9 @@ var DeviceManager = class extends EventEmitter2 {
     const disconnectPromises = Array.from(this.devices.entries()).map(async ([id, device]) => {
       try {
         await device.disconnect();
-        logger5.info("DeviceManager", `[${id}] \u65AD\u5F00\u8FDE\u63A5`);
+        logger3.info("DeviceManager", `[${id}] \u65AD\u5F00\u8FDE\u63A5`);
       } catch (error) {
-        logger5.error("DeviceManager", `[${id}] \u65AD\u5F00\u8FDE\u63A5\u5931\u8D25:`, error);
+        logger3.error("DeviceManager", `[${id}] \u65AD\u5F00\u8FDE\u63A5\u5931\u8D25:`, error);
       }
     });
     await Promise.allSettled(disconnectPromises);
@@ -826,7 +778,7 @@ var DeviceManager = class extends EventEmitter2 {
       return !connectedDeviceIds.has(deviceId);
     });
     if (failedConfigs.length > 0) {
-      logger5.info("DeviceManager", `\u5C1D\u8BD5\u91CD\u65B0\u8FDE\u63A5 ${failedConfigs.length} \u4E2A\u5931\u8D25\u7684\u8BBE\u5907`);
+      logger3.info("DeviceManager", `\u5C1D\u8BD5\u91CD\u65B0\u8FDE\u63A5 ${failedConfigs.length} \u4E2A\u5931\u8D25\u7684\u8BBE\u5907`);
       const reconnectPromises = failedConfigs.map((config) => this.initializeDevice(config));
       await Promise.allSettled(reconnectPromises);
     }
@@ -837,20 +789,20 @@ var DeviceManager = class extends EventEmitter2 {
   scheduleReconnect(config, deviceId) {
     const attempts = this.reconnectAttempts.get(deviceId) || 0;
     if (attempts >= this.maxReconnectAttempts) {
-      logger5.error("DeviceManager", `[${deviceId}] \u91CD\u8FDE\u6B21\u6570\u5DF2\u8FBE\u4E0A\u9650 (${this.maxReconnectAttempts})\uFF0C\u505C\u6B62\u91CD\u8FDE`);
+      logger3.error("DeviceManager", `[${deviceId}] \u91CD\u8FDE\u6B21\u6570\u5DF2\u8FBE\u4E0A\u9650 (${this.maxReconnectAttempts})\uFF0C\u505C\u6B62\u91CD\u8FDE`);
       this.reconnectAttempts.delete(deviceId);
       return;
     }
     const delay = this.reconnectDelay * 2 ** attempts;
-    logger5.info("DeviceManager", `\u5C06\u5728 ${delay}ms \u540E\u5C1D\u8BD5\u91CD\u8FDE\u8BBE\u5907 ${deviceId} (\u7B2C ${attempts + 1} \u6B21)`);
+    logger3.info("DeviceManager", `\u5C06\u5728 ${delay}ms \u540E\u5C1D\u8BD5\u91CD\u8FDE\u8BBE\u5907 ${deviceId} (\u7B2C ${attempts + 1} \u6B21)`);
     const timer = setTimeout(async () => {
       try {
-        logger5.info("DeviceManager", `\u5F00\u59CB\u91CD\u8FDE\u8BBE\u5907 ${deviceId}`);
+        logger3.info("DeviceManager", `\u5F00\u59CB\u91CD\u8FDE\u8BBE\u5907 ${deviceId}`);
         await this.initializeDevice(config);
         this.reconnectAttempts.delete(deviceId);
-        logger5.info("DeviceManager", `\u8BBE\u5907 ${deviceId} \u91CD\u8FDE\u6210\u529F`);
+        logger3.info("DeviceManager", `\u8BBE\u5907 ${deviceId} \u91CD\u8FDE\u6210\u529F`);
       } catch (error) {
-        logger5.error("DeviceManager", `[${deviceId}] \u91CD\u8FDE\u5931\u8D25:`, error);
+        logger3.error("DeviceManager", `[${deviceId}] \u91CD\u8FDE\u5931\u8D25:`, error);
         this.reconnectAttempts.set(deviceId, attempts + 1);
         this.scheduleReconnect(config, deviceId);
       }
@@ -864,7 +816,7 @@ var DeviceManager = class extends EventEmitter2 {
    */
   cancelAllReconnectTimers() {
     this.reconnectTimers.forEach((timer, deviceId) => {
-      logger5.info("DeviceManager", `\u53D6\u6D88\u8BBE\u5907 ${deviceId} \u7684\u91CD\u8FDE\u5B9A\u65F6\u5668`);
+      logger3.info("DeviceManager", `\u53D6\u6D88\u8BBE\u5907 ${deviceId} \u7684\u91CD\u8FDE\u5B9A\u65F6\u5668`);
       clearTimeout(timer);
     });
     this.reconnectTimers.clear();
@@ -883,10 +835,246 @@ var DeviceManager = class extends EventEmitter2 {
   }
 };
 
+// src/communication.ts
+import { z as z2 } from "zod";
+var logger4 = getLogger();
+var CommandCode = {
+  START: 1,
+  STOP: 2
+};
+var EventTypeCode = {
+  STATUS: 1,
+  ERROR: 2,
+  DEVICE: 3,
+  HEARTBEAT: 4
+};
+var RequestSchema = z2.object({
+  c: z2.nativeEnum(CommandCode),
+  d: z2.record(z2.unknown()).optional()
+});
+var RequestDataSchema = z2.object({
+  rssi: z2.string().optional()
+}).passthrough();
+var ResponseSchema = z2.object({
+  t: z2.nativeEnum(EventTypeCode),
+  d: z2.record(z2.unknown())
+});
+function createStatusResponse(data) {
+  const payload = {
+    t: EventTypeCode.STATUS,
+    d: data
+  };
+  return JSON.stringify(payload);
+}
+function createErrorResponse(message) {
+  const payload = {
+    t: EventTypeCode.ERROR,
+    d: {
+      msg: message
+    }
+  };
+  return JSON.stringify(payload);
+}
+function createDeviceEvent(data) {
+  const payload = {
+    t: EventTypeCode.DEVICE,
+    d: data
+  };
+  return JSON.stringify(payload);
+}
+function createHeartbeatEvent(data) {
+  const payload = {
+    t: EventTypeCode.HEARTBEAT,
+    d: data
+  };
+  return JSON.stringify(payload);
+}
+function parseJSONMessage(message) {
+  try {
+    const json = JSON.parse(message);
+    const validation = RequestSchema.safeParse(json);
+    if (validation.success) {
+      return validation.data;
+    }
+    logger4.error("parseJSONMessage", "Invalid message format:", validation.error);
+    return null;
+  } catch (error) {
+    logger4.error("parseJSONMessage", "Failed to parse JSON message:", error);
+    return null;
+  }
+}
+function parseRequestData(data) {
+  try {
+    const validation = RequestDataSchema.safeParse(data);
+    if (validation.success) {
+      return validation.data;
+    }
+    logger4.error("parseRequestData", "Invalid request data format:", validation.error);
+    return null;
+  } catch (error) {
+    logger4.error("parseRequestData", "Failed to parse request data:", error);
+    return null;
+  }
+}
+
+// src/heartbeat-manager.ts
+var logger5 = getLogger();
+var HeartbeatManager = class {
+  transport;
+  deviceManager;
+  heartbeatTimer = null;
+  heartbeatInterval = 2e3;
+  // 2秒
+  constructor(transport, deviceManager) {
+    this.transport = transport;
+    this.deviceManager = deviceManager;
+  }
+  /**
+   * 启动心跳定时器
+   */
+  start() {
+    if (this.heartbeatTimer) {
+      logger5.warn("HeartbeatManager", "\u5FC3\u8DF3\u5B9A\u65F6\u5668\u5DF2\u7ECF\u5728\u8FD0\u884C");
+      return;
+    }
+    this.heartbeatTimer = setInterval(() => {
+      this.sendHeartbeat();
+    }, this.heartbeatInterval);
+    logger5.info("HeartbeatManager", `\u5FC3\u8DF3\u5B9A\u65F6\u5668\u5DF2\u542F\u52A8\uFF0C\u95F4\u9694: ${this.heartbeatInterval}ms`);
+  }
+  /**
+   * 停止心跳定时器
+   */
+  stop() {
+    if (this.heartbeatTimer) {
+      clearInterval(this.heartbeatTimer);
+      this.heartbeatTimer = null;
+      logger5.info("HeartbeatManager", "\u5FC3\u8DF3\u5B9A\u65F6\u5668\u5DF2\u505C\u6B62");
+    }
+  }
+  /**
+   * 发送心跳事件
+   */
+  sendHeartbeat() {
+    try {
+      const stats = this.deviceManager.getConnectionStats();
+      const heartbeatData = createHeartbeatEvent({
+        run: stats.connected > 0
+      });
+      this.transport.send(heartbeatData);
+      logger5.debug("HeartbeatManager", "\u5FC3\u8DF3\u4E8B\u4EF6\u5DF2\u53D1\u9001", { connected: stats.connected });
+    } catch (error) {
+      logger5.error("HeartbeatManager", "\u53D1\u9001\u5FC3\u8DF3\u4E8B\u4EF6\u5931\u8D25:", error);
+    }
+  }
+  /**
+   * 获取心跳状态
+   */
+  isRunning() {
+    return this.heartbeatTimer !== null;
+  }
+  /**
+   * 设置心跳间隔（仅在停止状态下有效）
+   */
+  setInterval(interval) {
+    if (this.heartbeatTimer) {
+      logger5.warn("HeartbeatManager", "\u5FC3\u8DF3\u5B9A\u65F6\u5668\u6B63\u5728\u8FD0\u884C\uFF0C\u65E0\u6CD5\u4FEE\u6539\u95F4\u9694");
+      return;
+    }
+    if (interval < 1e3) {
+      logger5.warn("HeartbeatManager", "\u5FC3\u8DF3\u95F4\u9694\u4E0D\u80FD\u5C0F\u4E8E1000ms\uFF0C\u4F7F\u7528\u9ED8\u8BA4\u503C2000ms");
+      return;
+    }
+    logger5.info("HeartbeatManager", `\u5FC3\u8DF3\u95F4\u9694\u8BBE\u7F6E\u4E3A: ${interval}ms`);
+  }
+};
+
+// src/message-handler.ts
+var logger6 = getLogger();
+var MessageHandler = class {
+  deviceManager;
+  constructor(deviceManager) {
+    this.deviceManager = deviceManager;
+  }
+  /**
+   * 处理来自传输层的消息
+   * @param message JSON 字符串消息
+   * @param cb      响应回调
+   */
+  async handleMessage(message, cb) {
+    const request = message;
+    if (!request) {
+      const errorResponse = createErrorResponse("Invalid message format");
+      return cb(errorResponse);
+    }
+    try {
+      switch (request.c) {
+        case CommandCode.START:
+          return cb(await this.handleStartCommand(request.d));
+        case CommandCode.STOP:
+          return cb(await this.handleStopCommand());
+        default:
+          return cb(createErrorResponse("Unknown command"));
+      }
+    } catch (error) {
+      logger6.error("MessageHandler", "\u5904\u7406\u6307\u4EE4\u65F6\u53D1\u751F\u9519\u8BEF:", error);
+      return cb(createErrorResponse(error.message || "Failed to execute command"));
+    }
+  }
+  /**
+   * 处理错误
+   * @param error 错误信息
+   * @param cb    响应回调
+   */
+  handleError(error, cb) {
+    cb(createErrorResponse(error));
+  }
+  /**
+   * 处理设备事件
+   * @param device 设备数据
+   * @returns 设备事件消息
+   */
+  handleDeviceEvent(device) {
+    return createDeviceEvent(device);
+  }
+  /**
+   * 处理启动扫描指令
+   * @param requestData 请求数据
+   * @returns 启动扫描响应
+   */
+  async handleStartCommand(requestData) {
+    const data = parseRequestData(requestData);
+    const rssi = data?.rssi || "-60";
+    logger6.info("MessageHandler", "\u6536\u5230\u542F\u52A8\u626B\u63CF\u6307\u4EE4", { rssi });
+    try {
+      await this.deviceManager.startScan(rssi);
+      logger6.info("MessageHandler", "\u6240\u6709\u8BBE\u5907\u5F00\u59CB\u626B\u63CF");
+      return createStatusResponse({ msg: "Scan started" });
+    } catch (error) {
+      logger6.error("MessageHandler", "\u542F\u52A8\u626B\u63CF\u5931\u8D25:", error);
+      return createErrorResponse(error.message || "Failed to start scan");
+    }
+  }
+  /**
+   * 处理停止扫描指令
+   * @returns 停止扫描响应
+   */
+  async handleStopCommand() {
+    try {
+      await this.deviceManager.stopScan();
+      logger6.info("MessageHandler", "\u6240\u6709\u8BBE\u5907\u505C\u6B62\u626B\u63CF");
+      return createStatusResponse({ msg: "Scan stopped" });
+    } catch (error) {
+      logger6.error("MessageHandler", "\u505C\u6B62\u626B\u63CF\u5931\u8D25:", error);
+      return createErrorResponse(error.message || "Failed to stop scan");
+    }
+  }
+};
+
 // src/http-transport.ts
 import { EventEmitter as EventEmitter3 } from "events";
 import express from "express";
-var logger6 = getLogger();
+var logger7 = getLogger();
 var HttpTransport = class extends EventEmitter3 {
   server = null;
   sseClients = [];
@@ -901,7 +1089,7 @@ var HttpTransport = class extends EventEmitter3 {
   start = async () => {
     return new Promise((resolve) => {
       this.server = this.app.listen(this.port, () => {
-        logger6.info("HttpTransport", `HTTP server listening on http://0.0.0.0:${this.port}`);
+        logger7.info("HttpTransport", `HTTP server listening on http://0.0.0.0:${this.port}`);
         resolve();
       });
     });
@@ -912,7 +1100,7 @@ var HttpTransport = class extends EventEmitter3 {
       this.sseClients = [];
       if (this.server) {
         this.server.close(() => {
-          logger6.info("HttpTransport", "HTTP server stopped");
+          logger7.info("HttpTransport", "HTTP server stopped");
           resolve();
         });
       } else {
@@ -921,7 +1109,7 @@ var HttpTransport = class extends EventEmitter3 {
     });
   };
   send = (data) => {
-    logger6.info("HttpTransport", `Sending event to ${this.sseClients.length} clients`);
+    logger7.info("HttpTransport", `Sending event to ${this.sseClients.length} clients`);
     this.sseClients.forEach((res) => {
       res.write(`data: ${data}
 
@@ -974,10 +1162,10 @@ var HttpTransport = class extends EventEmitter3 {
     });
     res.write("\n");
     this.sseClients.push(res);
-    logger6.info("HttpTransport", "SSE client connected");
+    logger7.info("HttpTransport", "SSE client connected");
     res.on("close", () => {
       this.sseClients = this.sseClients.filter((client) => client !== res);
-      logger6.info("HttpTransport", "SSE client disconnected");
+      logger7.info("HttpTransport", "SSE client disconnected");
     });
   };
 };
@@ -986,7 +1174,7 @@ var HttpTransport = class extends EventEmitter3 {
 import { EventEmitter as EventEmitter4 } from "events";
 import { ReadlineParser as ReadlineParser2 } from "@serialport/parser-readline";
 import { SerialPort as SerialPort2 } from "serialport";
-var logger7 = getLogger();
+var logger8 = getLogger();
 var SerialTransport = class extends EventEmitter4 {
   port = null;
   parser = null;
@@ -1005,14 +1193,14 @@ var SerialTransport = class extends EventEmitter4 {
    * 启动串口传输层
    */
   start = async () => {
-    logger7.info("SerialTransport", `\u542F\u52A8\u4E32\u53E3\u4F20\u8F93\u5C42: ${this.config.serialPath}`);
+    logger8.info("SerialTransport", `\u542F\u52A8\u4E32\u53E3\u4F20\u8F93\u5C42: ${this.config.serialPath}`);
     await this.connect();
   };
   /**
    * 停止串口传输层
    */
   stop = async () => {
-    logger7.info("SerialTransport", "\u505C\u6B62\u4E32\u53E3\u4F20\u8F93\u5C42");
+    logger8.info("SerialTransport", "\u505C\u6B62\u4E32\u53E3\u4F20\u8F93\u5C42");
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
@@ -1024,7 +1212,7 @@ var SerialTransport = class extends EventEmitter4 {
    */
   send = (data) => {
     if (!this.isConnected || !this.port) {
-      logger7.warn("SerialTransport", "\u4E32\u53E3\u672A\u8FDE\u63A5\uFF0C\u65E0\u6CD5\u53D1\u9001\u6570\u636E");
+      logger8.warn("SerialTransport", "\u4E32\u53E3\u672A\u8FDE\u63A5\uFF0C\u65E0\u6CD5\u53D1\u9001\u6570\u636E");
       return;
     }
     try {
@@ -1032,14 +1220,14 @@ var SerialTransport = class extends EventEmitter4 {
 `;
       this.port.write(dataWithNewline, (err) => {
         if (err) {
-          logger7.error("SerialTransport", "\u53D1\u9001\u6570\u636E\u5931\u8D25:", err);
+          logger8.error("SerialTransport", "\u53D1\u9001\u6570\u636E\u5931\u8D25:", err);
           this.emit("error", `\u53D1\u9001\u6570\u636E\u5931\u8D25: ${err.message}`);
         } else {
-          logger7.debug("SerialTransport", "\u53D1\u9001\u6570\u636E:", data);
+          logger8.debug("SerialTransport", "\u53D1\u9001\u6570\u636E:", data);
         }
       });
     } catch (error) {
-      logger7.error("SerialTransport", "\u53D1\u9001\u6570\u636E\u5F02\u5E38:", error);
+      logger8.error("SerialTransport", "\u53D1\u9001\u6570\u636E\u5F02\u5E38:", error);
       this.emit("error", `\u53D1\u9001\u6570\u636E\u5F02\u5E38: ${error instanceof Error ? error.message : String(error)}`);
     }
   };
@@ -1061,35 +1249,35 @@ var SerialTransport = class extends EventEmitter4 {
         this.port.on("open", () => {
           this.isConnected = true;
           this.reconnectAttempts = 0;
-          logger7.info("SerialTransport", `\u4E32\u53E3\u8FDE\u63A5\u6210\u529F: ${this.config.serialPath}`);
+          logger8.info("SerialTransport", `\u4E32\u53E3\u8FDE\u63A5\u6210\u529F: ${this.config.serialPath}`);
           resolve();
         });
         this.port.on("error", (err) => {
-          logger7.error("SerialTransport", "\u4E32\u53E3\u9519\u8BEF:", err);
+          logger8.error("SerialTransport", "\u4E32\u53E3\u9519\u8BEF:", err);
           this.isConnected = false;
           this.emit("error", `\u4E32\u53E3\u9519\u8BEF: ${err.message}`);
           reject(err);
         });
         this.port.on("close", () => {
-          logger7.warn("SerialTransport", "\u4E32\u53E3\u8FDE\u63A5\u5173\u95ED");
+          logger8.warn("SerialTransport", "\u4E32\u53E3\u8FDE\u63A5\u5173\u95ED");
           this.isConnected = false;
           this.scheduleReconnect();
         });
         this.port.on("data", (data) => {
-          logger7.debug("SerialTransport", "\u63A5\u6536\u539F\u59CB\u6570\u636E:", data.toString("utf8"));
+          logger8.debug("SerialTransport", "\u63A5\u6536\u539F\u59CB\u6570\u636E:", data.toString("utf8"));
         });
         this.parser.on("data", (data) => {
-          logger7.debug("SerialTransport", "\u63A5\u6536\u89E3\u6790\u5206\u9694\u7B26\u540E\u7684\u6570\u636E:", data);
+          logger8.debug("SerialTransport", "\u63A5\u6536\u89E3\u6790\u5206\u9694\u7B26\u540E\u7684\u6570\u636E:", data);
           try {
             this.handleReceivedData(data);
           } catch (error) {
-            logger7.error("SerialTransport", "\u5904\u7406\u63A5\u6536\u6570\u636E\u5931\u8D25:", error);
+            logger8.error("SerialTransport", "\u5904\u7406\u63A5\u6536\u6570\u636E\u5931\u8D25:", error);
             this.emit("error", `\u5904\u7406\u63A5\u6536\u6570\u636E\u5931\u8D25: ${error instanceof Error ? error.message : String(error)}`);
           }
         });
         this.port.open();
       } catch (error) {
-        logger7.error("SerialTransport", "\u521B\u5EFA\u4E32\u53E3\u8FDE\u63A5\u5931\u8D25:", error);
+        logger8.error("SerialTransport", "\u521B\u5EFA\u4E32\u53E3\u8FDE\u63A5\u5931\u8D25:", error);
         reject(error);
       }
     });
@@ -1102,7 +1290,7 @@ var SerialTransport = class extends EventEmitter4 {
       if (this.port && this.isConnected) {
         this.port.close(() => {
           this.isConnected = false;
-          logger7.info("SerialTransport", "\u4E32\u53E3\u8FDE\u63A5\u5DF2\u65AD\u5F00");
+          logger8.info("SerialTransport", "\u4E32\u53E3\u8FDE\u63A5\u5DF2\u65AD\u5F00");
           resolve();
         });
       } else {
@@ -1120,13 +1308,13 @@ var SerialTransport = class extends EventEmitter4 {
     try {
       const requestPayload = parseJSONMessage(data);
       if (!requestPayload) {
-        logger7.warn("SerialTransport", "\u63A5\u6536\u5230\u7684\u6570\u636E\u683C\u5F0F\u4E0D\u6B63\u786E:", data);
+        logger8.warn("SerialTransport", "\u63A5\u6536\u5230\u7684\u6570\u636E\u683C\u5F0F\u4E0D\u6B63\u786E:", data);
         this.emit("error", `\u63A5\u6536\u5230\u7684\u6570\u636E\u683C\u5F0F\u4E0D\u6B63\u786E: ${data}`, responseCallback);
         return;
       }
       this.emit("data", requestPayload, responseCallback);
     } catch (error) {
-      logger7.error("SerialTransport", "\u5904\u7406\u63A5\u6536\u6570\u636E\u5931\u8D25:", error);
+      logger8.error("SerialTransport", "\u5904\u7406\u63A5\u6536\u6570\u636E\u5931\u8D25:", error);
       this.emit("error", `\u5904\u7406\u63A5\u6536\u6570\u636E\u5931\u8D25: ${error instanceof Error ? error.message : String(error)}`, responseCallback);
     }
   }
@@ -1135,21 +1323,21 @@ var SerialTransport = class extends EventEmitter4 {
    */
   scheduleReconnect() {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      logger7.error("SerialTransport", `\u91CD\u8FDE\u5931\u8D25\uFF0C\u5DF2\u8FBE\u5230\u6700\u5927\u91CD\u8FDE\u6B21\u6570: ${this.maxReconnectAttempts}`);
+      logger8.error("SerialTransport", `\u91CD\u8FDE\u5931\u8D25\uFF0C\u5DF2\u8FBE\u5230\u6700\u5927\u91CD\u8FDE\u6B21\u6570: ${this.maxReconnectAttempts}`);
       return;
     }
     if (this.reconnectTimer) {
       return;
     }
     this.reconnectAttempts++;
-    logger7.info("SerialTransport", `${this.reconnectInterval / 1e3}\u79D2\u540E\u5C1D\u8BD5\u91CD\u8FDE (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
+    logger8.info("SerialTransport", `${this.reconnectInterval / 1e3}\u79D2\u540E\u5C1D\u8BD5\u91CD\u8FDE (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
     this.reconnectTimer = setTimeout(async () => {
       this.reconnectTimer = null;
       try {
         await this.connect();
-        logger7.info("SerialTransport", "\u91CD\u8FDE\u6210\u529F");
+        logger8.info("SerialTransport", "\u91CD\u8FDE\u6210\u529F");
       } catch (error) {
-        logger7.error("SerialTransport", "\u91CD\u8FDE\u5931\u8D25:", error);
+        logger8.error("SerialTransport", "\u91CD\u8FDE\u5931\u8D25:", error);
         this.scheduleReconnect();
       }
     }, this.reconnectInterval);
@@ -1168,161 +1356,250 @@ var SerialTransport = class extends EventEmitter4 {
   }
 };
 
-// src/index.ts
-var deviceManager = null;
-var transport = null;
-var heartbeatTimer = null;
-async function handleMessage(message, cb) {
-  const request = message;
-  if (!request) {
-    const errorResponse = createErrorResponse("Invalid message format");
-    return cb(errorResponse);
+// src/transport-factory.ts
+var logger9 = getLogger();
+function createTransport(config) {
+  logger9.info("TransportFactory", "\u6B63\u5728\u521B\u5EFA\u4F20\u8F93\u5C42:", config.type);
+  switch (config.type) {
+    case "http":
+      return createHttpTransport(config);
+    case "serial":
+      return createSerialTransport(config);
+    default:
+      throw new Error(`\u4E0D\u652F\u6301\u7684\u4F20\u8F93\u5C42\u7C7B\u578B: ${config.type}`);
   }
-  try {
-    switch (request.c) {
-      case CommandCode.START:
-        return cb(await onReceiveStart(request.d));
-      case CommandCode.STOP:
-        return cb(await onReceiveStop());
-      default:
-        return cb(createErrorResponse("Unknown command"));
+}
+function createHttpTransport(config) {
+  logger9.info("TransportFactory", `\u521B\u5EFA HTTP \u4F20\u8F93\u5C42\uFF0C\u7AEF\u53E3: ${config.port}`);
+  return new HttpTransport(config.port);
+}
+function createSerialTransport(config) {
+  logger9.info("TransportFactory", `\u521B\u5EFA\u4E32\u53E3\u4F20\u8F93\u5C42\uFF0C\u7AEF\u53E3: ${config.serialPath}`);
+  return new SerialTransport(config);
+}
+
+// src/app-controller.ts
+var logger10 = getLogger();
+var AppController = class extends EventEmitter5 {
+  deviceManager = null;
+  transport = null;
+  messageHandler = null;
+  heartbeatManager = null;
+  isInitialized = false;
+  /**
+   * 初始化应用程序
+   */
+  async initialize() {
+    if (this.isInitialized) {
+      logger10.warn("AppController", "\u5E94\u7528\u7A0B\u5E8F\u5DF2\u7ECF\u521D\u59CB\u5316");
+      return;
     }
-  } catch (error) {
-    logger.error("handleMessage", "\u5904\u7406\u6307\u4EE4\u65F6\u53D1\u751F\u9519\u8BEF:", error);
-    return cb(createErrorResponse(error.message || "Failed to execute command"));
-  }
-}
-function startHeartbeat() {
-  if (heartbeatTimer) {
-    clearInterval(heartbeatTimer);
-  }
-  heartbeatTimer = setInterval(() => {
-    if (transport && deviceManager) {
-      const stats = deviceManager.getConnectionStats();
-      const heartbeatData = createHeartbeatEvent({
-        run: stats.connected > 0
-      });
-      transport.send(heartbeatData);
+    try {
+      const configManager2 = getConfigManager();
+      this.initializeLogger(configManager2);
+      this.validateConfiguration(configManager2);
+      await this.initializeDeviceManager(configManager2);
+      await this.initializeTransport(configManager2);
+      this.initializeMessageHandler();
+      this.initializeHeartbeatManager();
+      this.setupEventListeners();
+      await this.startTransport();
+      await this.initializeDevices();
+      this.startHeartbeat();
+      this.isInitialized = true;
+      logger10.info("AppController", "\u5E94\u7528\u7A0B\u5E8F\u521D\u59CB\u5316\u5B8C\u6210");
+    } catch (error) {
+      logger10.error("AppController", "\u5E94\u7528\u7A0B\u5E8F\u521D\u59CB\u5316\u5931\u8D25:", error);
+      throw error;
     }
-  }, 2e3);
-}
-function stopHeartbeat() {
-  if (heartbeatTimer) {
-    clearInterval(heartbeatTimer);
-    heartbeatTimer = null;
   }
-}
-async function main() {
-  const configManager2 = getConfigManager();
-  const loggingConfig = configManager2.getLoggingConfig();
-  const logger8 = getLogger({
-    level: parseLogLevel(loggingConfig.level),
-    enableDevicePrefix: loggingConfig.enableDevicePrefix,
-    enableTimestamp: true
-  });
-  const validation = configManager2.validate();
-  if (!validation.valid) {
-    logger8.error("Main", "\u914D\u7F6E\u9A8C\u8BC1\u5931\u8D25:");
-    validation.errors.forEach((error) => logger8.error("Main", `  - ${error}`));
-    process2.exit(1);
+  /**
+   * 关闭应用程序
+   */
+  async shutdown() {
+    logger10.info("AppController", "\u6B63\u5728\u5173\u95ED\u5E94\u7528\u7A0B\u5E8F...");
+    try {
+      this.heartbeatManager?.stop();
+      await this.deviceManager?.disconnectAll();
+      await this.transport?.stop();
+      this.isInitialized = false;
+      logger10.info("AppController", "\u5E94\u7528\u7A0B\u5E8F\u5DF2\u5B89\u5168\u5173\u95ED");
+    } catch (error) {
+      logger10.error("AppController", "\u5173\u95ED\u5E94\u7528\u7A0B\u5E8F\u65F6\u53D1\u751F\u9519\u8BEF:", error);
+      throw error;
+    }
   }
-  const deviceConfigs = configManager2.getDeviceConfigs();
-  if (deviceConfigs.length === 0) {
-    logger8.error("Main", "\u6CA1\u6709\u542F\u7528\u7684\u8BBE\u5907\u914D\u7F6E");
-    process2.exit(1);
+  /**
+   * 获取设备管理器
+   */
+  getDeviceManager() {
+    return this.deviceManager;
   }
-  logger8.info("Main", `\u52A0\u8F7D\u4E86 ${deviceConfigs.length} \u4E2A\u8BBE\u5907\u914D\u7F6E:`);
-  deviceConfigs.forEach((device) => {
-    logger8.info("Main", `  - ${device.deviceId}: ${device.serialPath}`);
-  });
-  deviceManager = new DeviceManager(deviceConfigs);
-  const transportConfig = configManager2.getTransportConfig();
-  if (transportConfig.type === "http") {
-    transport = new HttpTransport(transportConfig.port);
-    logger8.info("Main", `\u4F7F\u7528 HTTP \u4F20\u8F93\u5C42\uFF0C\u7AEF\u53E3: ${transportConfig.port}`);
-  } else if (transportConfig.type === "serial") {
-    transport = new SerialTransport(transportConfig);
-    logger8.info("Main", `\u4F7F\u7528\u4E32\u53E3\u4F20\u8F93\u5C42\uFF0C\u7AEF\u53E3: ${transportConfig.serialPath}`);
-  } else {
-    logger8.error("Main", "\u4E0D\u652F\u6301\u7684\u4F20\u8F93\u5C42\u7C7B\u578B:", transportConfig.type);
-    process2.exit(1);
+  /**
+   * 获取传输层
+   */
+  getTransport() {
+    return this.transport;
   }
-  transport.on("data", (message, cb) => {
-    handleMessage(message, cb);
-  });
-  transport.on("error", (error, cb) => {
-    logger8.error("Main", "\u4F20\u8F93\u5C42\u9519\u8BEF:", error);
-    cb(createErrorResponse(error));
-  });
-  deviceManager.on("device", (device) => {
-    logger8.info("Main", "\u8BBE\u5907\u4E0A\u62A5:", device);
-    const event = createDeviceEvent(device);
-    transport?.send(event);
-  });
-  deviceManager.on("deviceConnected", (info) => {
-    logger8.info("Main", `\u8BBE\u5907 ${info.deviceId} (${info.serialPath}) \u8FDE\u63A5\u6210\u529F`);
-  });
-  deviceManager.on("deviceDisconnected", (info) => {
-    logger8.warn("Main", `\u8BBE\u5907 ${info.deviceId} (${info.serialPath}) \u65AD\u5F00\u8FDE\u63A5`);
-  });
-  deviceManager.on("deviceError", (error) => {
-    logger8.error("Main", `\u8BBE\u5907 ${error.deviceId} (${error.serialPath}) \u53D1\u751F\u9519\u8BEF:`, error.error);
-  });
-  try {
-    await transport.start();
-    logger8.info("Main", "\u4F20\u8F93\u5C42\u542F\u52A8\u6210\u529F");
-    await deviceManager.initializeDevices();
-    const stats = deviceManager.getConnectionStats();
-    logger8.info("Main", `\u8BBE\u5907\u521D\u59CB\u5316\u5B8C\u6210: ${stats.connected}/${stats.total} \u4E2A\u8BBE\u5907\u8FDE\u63A5\u6210\u529F`);
+  /**
+   * 初始化日志管理器
+   */
+  initializeLogger(configManager2) {
+    const loggingConfig = configManager2.getLoggingConfig();
+    getLogger({
+      level: parseLogLevel(loggingConfig.level),
+      enableDevicePrefix: loggingConfig.enableDevicePrefix,
+      enableTimestamp: true
+    });
+    logger10.info("AppController", "\u65E5\u5FD7\u7BA1\u7406\u5668\u521D\u59CB\u5316\u5B8C\u6210");
+  }
+  /**
+   * 验证配置
+   */
+  validateConfiguration(configManager2) {
+    const validation = configManager2.validate();
+    if (!validation.valid) {
+      logger10.error("AppController", "\u914D\u7F6E\u9A8C\u8BC1\u5931\u8D25:");
+      validation.errors.forEach((error) => logger10.error("AppController", `  - ${error}`));
+      throw new Error("\u914D\u7F6E\u9A8C\u8BC1\u5931\u8D25");
+    }
+    logger10.info("AppController", "\u914D\u7F6E\u9A8C\u8BC1\u901A\u8FC7");
+  }
+  /**
+   * 初始化设备管理器
+   */
+  async initializeDeviceManager(configManager2) {
+    const deviceConfigs = configManager2.getDeviceConfigs();
+    if (deviceConfigs.length === 0) {
+      throw new Error("\u6CA1\u6709\u542F\u7528\u7684\u8BBE\u5907\u914D\u7F6E");
+    }
+    logger10.info("AppController", `\u52A0\u8F7D\u4E86 ${deviceConfigs.length} \u4E2A\u8BBE\u5907\u914D\u7F6E:`);
+    deviceConfigs.forEach((device) => {
+      logger10.info("AppController", `  - ${device.deviceId}: ${device.serialPath}`);
+    });
+    this.deviceManager = new DeviceManager(deviceConfigs);
+    logger10.info("AppController", "\u8BBE\u5907\u7BA1\u7406\u5668\u521D\u59CB\u5316\u5B8C\u6210");
+  }
+  /**
+   * 初始化传输层
+   */
+  async initializeTransport(configManager2) {
+    const transportConfig = configManager2.getTransportConfig();
+    this.transport = createTransport(transportConfig);
+    logger10.info("AppController", "\u4F20\u8F93\u5C42\u521D\u59CB\u5316\u5B8C\u6210");
+  }
+  /**
+   * 初始化消息处理器
+   */
+  initializeMessageHandler() {
+    if (!this.deviceManager) {
+      throw new Error("\u8BBE\u5907\u7BA1\u7406\u5668\u672A\u521D\u59CB\u5316");
+    }
+    this.messageHandler = new MessageHandler(this.deviceManager);
+    logger10.info("AppController", "\u6D88\u606F\u5904\u7406\u5668\u521D\u59CB\u5316\u5B8C\u6210");
+  }
+  /**
+   * 初始化心跳管理器
+   */
+  initializeHeartbeatManager() {
+    if (!this.transport || !this.deviceManager) {
+      throw new Error("\u4F20\u8F93\u5C42\u6216\u8BBE\u5907\u7BA1\u7406\u5668\u672A\u521D\u59CB\u5316");
+    }
+    this.heartbeatManager = new HeartbeatManager(this.transport, this.deviceManager);
+    logger10.info("AppController", "\u5FC3\u8DF3\u7BA1\u7406\u5668\u521D\u59CB\u5316\u5B8C\u6210");
+  }
+  /**
+   * 设置事件监听器
+   */
+  setupEventListeners() {
+    if (!this.transport || !this.deviceManager || !this.messageHandler) {
+      throw new Error("\u7EC4\u4EF6\u672A\u5B8C\u5168\u521D\u59CB\u5316");
+    }
+    this.transport.on("data", (message, cb) => {
+      this.messageHandler.handleMessage(message, cb);
+    });
+    this.transport.on("error", (error, cb) => {
+      logger10.error("AppController", "\u4F20\u8F93\u5C42\u9519\u8BEF:", error);
+      this.messageHandler.handleError(error, cb);
+    });
+    this.deviceManager.on("device", (device) => {
+      logger10.info("AppController", "\u8BBE\u5907\u4E0A\u62A5:", device);
+      const event = this.messageHandler.handleDeviceEvent(device);
+      this.transport.send(event);
+    });
+    this.deviceManager.on("deviceConnected", (info) => {
+      logger10.info("AppController", `\u8BBE\u5907 ${info.deviceId} (${info.serialPath}) \u8FDE\u63A5\u6210\u529F`);
+    });
+    this.deviceManager.on("deviceDisconnected", (info) => {
+      logger10.warn("AppController", `\u8BBE\u5907 ${info.deviceId} (${info.serialPath}) \u65AD\u5F00\u8FDE\u63A5`);
+    });
+    this.deviceManager.on("deviceError", (error) => {
+      logger10.error("AppController", `\u8BBE\u5907 ${error.deviceId} (${error.serialPath}) \u53D1\u751F\u9519\u8BEF:`, error.error);
+    });
+    logger10.info("AppController", "\u4E8B\u4EF6\u76D1\u542C\u5668\u8BBE\u7F6E\u5B8C\u6210");
+  }
+  /**
+   * 启动传输层
+   */
+  async startTransport() {
+    if (!this.transport) {
+      throw new Error("\u4F20\u8F93\u5C42\u672A\u521D\u59CB\u5316");
+    }
+    await this.transport.start();
+    logger10.info("AppController", "\u4F20\u8F93\u5C42\u542F\u52A8\u6210\u529F");
+  }
+  /**
+   * 初始化设备
+   */
+  async initializeDevices() {
+    if (!this.deviceManager) {
+      throw new Error("\u8BBE\u5907\u7BA1\u7406\u5668\u672A\u521D\u59CB\u5316");
+    }
+    await this.deviceManager.initializeDevices();
+    const stats = this.deviceManager.getConnectionStats();
+    logger10.info("AppController", `\u8BBE\u5907\u521D\u59CB\u5316\u5B8C\u6210: ${stats.connected}/${stats.total} \u4E2A\u8BBE\u5907\u8FDE\u63A5\u6210\u529F`);
     if (stats.reconnecting > 0) {
-      logger8.info("Main", `${stats.reconnecting} \u4E2A\u8BBE\u5907\u6B63\u5728\u91CD\u8FDE\u4E2D`);
+      logger10.info("AppController", `${stats.reconnecting} \u4E2A\u8BBE\u5907\u6B63\u5728\u91CD\u8FDE\u4E2D`);
     }
     if (stats.connected === 0 && stats.reconnecting === 0) {
-      logger8.error("Main", "\u6CA1\u6709\u8BBE\u5907\u8FDE\u63A5\u6210\u529F\uFF0C\u7A0B\u5E8F\u9000\u51FA");
-      process2.exit(1);
+      throw new Error("\u6CA1\u6709\u8BBE\u5907\u8FDE\u63A5\u6210\u529F");
     }
-    startHeartbeat();
-    logger8.info("Main", "\u5FC3\u8DF3\u5B9A\u65F6\u5668\u5DF2\u542F\u52A8");
+  }
+  /**
+   * 启动心跳
+   */
+  startHeartbeat() {
+    if (!this.heartbeatManager) {
+      throw new Error("\u5FC3\u8DF3\u7BA1\u7406\u5668\u672A\u521D\u59CB\u5316");
+    }
+    this.heartbeatManager.start();
+    logger10.info("AppController", "\u5FC3\u8DF3\u5B9A\u65F6\u5668\u5DF2\u542F\u52A8");
+  }
+};
+
+// src/index.ts
+var logger11 = getLogger();
+var appController = null;
+async function main() {
+  try {
+    logger11.info("Main", "\u6B63\u5728\u542F\u52A8\u84DD\u7259\u8BBE\u5907\u68C0\u6D4B\u7CFB\u7EDF...");
+    appController = new AppController();
+    await appController.initialize();
+    logger11.info("Main", "\u84DD\u7259\u8BBE\u5907\u68C0\u6D4B\u7CFB\u7EDF\u542F\u52A8\u6210\u529F");
   } catch (error) {
-    logger8.error("Main", "\u542F\u52A8\u5931\u8D25:", error);
+    logger11.error("Main", "\u542F\u52A8\u5931\u8D25:", error);
     process2.exit(1);
-  }
-}
-async function onReceiveStart(requestData) {
-  const logger8 = getLogger();
-  const data = parseRequestData(requestData);
-  const rssi = data?.rssi || "-60";
-  logger8.info("Main", "\u6536\u5230\u542F\u52A8\u626B\u63CF\u6307\u4EE4", { rssi });
-  try {
-    await deviceManager?.startScan(rssi);
-    logger8.info("Main", "\u6240\u6709\u8BBE\u5907\u5F00\u59CB\u626B\u63CF");
-    return createStatusResponse({ msg: "Scan started" });
-  } catch (error) {
-    logger8.error("Main", "\u542F\u52A8\u626B\u63CF\u5931\u8D25:", error);
-    return createErrorResponse(error.message || "Failed to start scan");
-  }
-}
-async function onReceiveStop() {
-  const logger8 = getLogger();
-  try {
-    await deviceManager?.stopScan();
-    logger8.info("Main", "\u6240\u6709\u8BBE\u5907\u505C\u6B62\u626B\u63CF");
-    return createStatusResponse({ msg: "Scan stopped" });
-  } catch (error) {
-    logger8.error("Main", "\u505C\u6B62\u626B\u63CF\u5931\u8D25:", error);
-    return createErrorResponse(error.message || "Failed to stop scan");
   }
 }
 process2.on("SIGINT", async () => {
-  const logger8 = getLogger();
-  logger8.info("Main", "\n\u6B63\u5728\u5173\u95ED\u7A0B\u5E8F...");
+  logger11.info("Main", "\n\u6B63\u5728\u5173\u95ED\u7A0B\u5E8F...");
   try {
-    stopHeartbeat();
-    await deviceManager?.disconnectAll();
-    await transport?.stop();
-    logger8.info("Main", "\u7A0B\u5E8F\u5DF2\u5B89\u5168\u5173\u95ED");
+    if (appController) {
+      await appController.shutdown();
+    }
+    logger11.info("Main", "\u7A0B\u5E8F\u5DF2\u5B89\u5168\u5173\u95ED");
   } catch (error) {
-    logger8.error("Main", "\u5173\u95ED\u7A0B\u5E8F\u65F6\u53D1\u751F\u9519\u8BEF:", error);
+    logger11.error("Main", "\u5173\u95ED\u7A0B\u5E8F\u65F6\u53D1\u751F\u9519\u8BEF:", error);
   }
   process2.exit();
 });

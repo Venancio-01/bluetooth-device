@@ -33,6 +33,7 @@ const SerialTransportConfigSchema = z.object({
 const AppConfigSchema = z.object({
   devices: z.array(DeviceConfigSchema),
   enabledTransports: z.enum(['http', 'serial']).optional().default('http'),
+  reportInterval: z.number().optional().default(5000),
   httpTransport: HttpTransportConfigSchema.optional().default({ type: 'http', port: 8888 }),
   serialTransport: SerialTransportConfigSchema.optional().default({ type: 'serial', serialPath: '/dev/ttyUSB0', baudRate: 115200, dataBits: 8, stopBits: 1, parity: 'none', timeout: 5000 }),
   logging: z.object({
@@ -55,6 +56,7 @@ const DEFAULT_CONFIG: AppConfig = {
       enabled: true,
     },
   ],
+  reportInterval: 5000,
   enabledTransports: 'http',
   httpTransport: {
     type: 'http',
