@@ -20,6 +20,10 @@ function main() {
   port.on('data', (data) => {
     console.log('data', data)
   })
+
+  setTimeout(() => {
+    port.write('1234567890')
+  }, 5000)
 }
 
 main()
