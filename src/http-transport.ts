@@ -1,9 +1,11 @@
 import type { Server } from 'http'
-import type { RequestPayload } from './communication'
 import type { ITransport, ResponseCallback } from './transport'
 import { EventEmitter } from 'events'
 import express from 'express'
 import { parseJSONMessage } from './communication'
+import { getLogger } from './logger'
+
+const logger = getLogger()
 
 export class HttpTransport extends EventEmitter implements ITransport {
   private server: Server | null = null
@@ -21,7 +23,7 @@ export class HttpTransport extends EventEmitter implements ITransport {
   start = async () => {
     return new Promise<void>((resolve) => {
       this.server = this.app.listen(this.port, () => {
-        console.log(`HTTP server listening on http://0.0.0.0:${this.port}`)
+        logger.info('HttpTransport', `HTTP server listening on http://0.0.0.0:${this.port}`)
         resolve()
       })
     })
@@ -33,7 +35,7 @@ export class HttpTransport extends EventEmitter implements ITransport {
       this.sseClients = []
       if (this.server) {
         this.server.close(() => {
-          console.log('HTTP server stopped')
+          logger.info('HttpTransport', 'HTTP server stopped')
           resolve()
         })
       }
@@ -44,7 +46,7 @@ export class HttpTransport extends EventEmitter implements ITransport {
   }
 
   send = (data: string) => {
-    console.log(`Sending event to ${this.sseClients.length} clients`)
+    logger.info('HttpTransport', `Sending event to ${this.sseClients.length} clients`)
     this.sseClients.forEach((res) => {
       res.write(`data: ${data}\n\n`)
     })
@@ -101,11 +103,11 @@ export class HttpTransport extends EventEmitter implements ITransport {
     res.write('\n') // Start the SSE stream
 
     this.sseClients.push(res)
-    console.log('SSE client connected')
+    logger.info('HttpTransport', 'SSE client connected')
 
     res.on('close', () => {
       this.sseClients = this.sseClients.filter(client => client !== res)
-      console.log('SSE client disconnected')
+      logger.info('HttpTransport', 'SSE client disconnected')
     })
   }
 }

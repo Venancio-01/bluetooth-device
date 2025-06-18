@@ -44,7 +44,7 @@ async function handleMessage(message: RequestPayload, cb: ResponseCallback) {
     }
   }
   catch (error: any) {
-    console.error('处理指令时发生错误:', error)
+    logger.error('handleMessage', '处理指令时发生错误:', error)
     return cb(createErrorResponse(error.message || 'Failed to execute command'))
   }
 }

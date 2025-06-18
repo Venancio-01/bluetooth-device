@@ -1,5 +1,8 @@
 import { EventEmitter } from 'events'
 import { BlueDevice } from './blue-device'
+import { getLogger } from './logger'
+
+const logger = getLogger()
 
 export interface DeviceConfig {
   serialPath: string
@@ -52,7 +55,7 @@ export class DeviceManager extends EventEmitter {
     results.forEach((result, index) => {
       if (result.status === 'rejected') {
         const config = this.deviceConfigs[index]
-        console.error(`[DeviceManager] 设备 ${config?.deviceId || config?.serialPath} 初始化失败:`, result.reason)
+        logger.error('DeviceManager', `[${config?.deviceId || config?.serialPath}] 初始化失败:`, result.reason)
       }
     })
   }
@@ -66,13 +69,13 @@ export class DeviceManager extends EventEmitter {
 
     // 监听设备事件并转发
     device.on('device', (deviceData) => {
-      console.log(`[DeviceManager] 设备 ${deviceId} 上报:`, deviceData)
+      logger.info('DeviceManager', `[${deviceId}] 上报:`, deviceData)
       this.emit('device', deviceData)
     })
 
     // 监听设备错误
     device.on('error', (error) => {
-      console.error(`[DeviceManager] 设备 ${deviceId} 错误:`, error)
+      logger.error('DeviceManager', `[${deviceId}] 错误:`, error)
       this.emit('deviceError', {
         deviceId,
         serialPath: device.getSerialPath(),
@@ -82,7 +85,7 @@ export class DeviceManager extends EventEmitter {
 
     // 监听设备断开连接
     device.on('disconnected', () => {
-      console.warn(`[DeviceManager] 设备 ${deviceId} 断开连接`)
+      logger.warn('DeviceManager', `[${deviceId}] 断开连接`)
       this.devices.delete(deviceId)
       this.emit('deviceDisconnected', {
         deviceId,
@@ -95,10 +98,10 @@ export class DeviceManager extends EventEmitter {
 
     try {
       await device.connect()
-      console.log(`[DeviceManager] 设备 ${deviceId} 连接成功`)
+      logger.info('DeviceManager', `[${deviceId}] 连接成功`)
 
       await device.initialize()
-      console.log(`[DeviceManager] 设备 ${deviceId} 初始化完成`)
+      logger.info('DeviceManager', `[${deviceId}] 初始化完成`)
 
       this.devices.set(deviceId, device)
 
@@ -108,7 +111,7 @@ export class DeviceManager extends EventEmitter {
       })
     }
     catch (error) {
-      console.error(`[DeviceManager] 设备 ${deviceId} 连接或初始化失败:`, error)
+      logger.error('DeviceManager', `[${deviceId}] 连接或初始化失败:`, error)
       throw error
     }
   }
@@ -154,17 +157,17 @@ export class DeviceManager extends EventEmitter {
         throw new Error(`设备 ${deviceId} 不存在`)
       }
       await device.startScan(rssi)
-      console.log(`[DeviceManager] 设备 ${deviceId} 开始扫描`)
+      logger.info('DeviceManager', `[${deviceId}] 开始扫描`)
     }
     else {
       // 启动所有设备的扫描
       const startPromises = Array.from(this.devices.entries()).map(async ([id, device]) => {
         try {
           await device.startScan(rssi)
-          console.log(`[DeviceManager] 设备 ${id} 开始扫描`)
+          logger.info('DeviceManager', `[${id}] 开始扫描`)
         }
         catch (error) {
-          console.error(`[DeviceManager] 设备 ${id} 启动扫描失败:`, error)
+          logger.error('DeviceManager', `[${id}] 启动扫描失败:`, error)
         }
       })
       await Promise.allSettled(startPromises)
@@ -182,17 +185,17 @@ export class DeviceManager extends EventEmitter {
         throw new Error(`设备 ${deviceId} 不存在`)
       }
       await device.stopScan()
-      console.log(`[DeviceManager] 设备 ${deviceId} 停止扫描`)
+      logger.info('DeviceManager', `[${deviceId}] 停止扫描`)
     }
     else {
       // 停止所有设备的扫描
       const stopPromises = Array.from(this.devices.entries()).map(async ([id, device]) => {
         try {
           await device.stopScan()
-          console.log(`[DeviceManager] 设备 ${id} 停止扫描`)
+          logger.info('DeviceManager', `[${id}] 停止扫描`)
         }
         catch (error) {
-          console.error(`[DeviceManager] 设备 ${id} 停止扫描失败:`, error)
+          logger.error('DeviceManager', `[${id}] 停止扫描失败:`, error)
         }
       })
       await Promise.allSettled(stopPromises)
@@ -209,10 +212,10 @@ export class DeviceManager extends EventEmitter {
     const disconnectPromises = Array.from(this.devices.entries()).map(async ([id, device]) => {
       try {
         await device.disconnect()
-        console.log(`[DeviceManager] 设备 ${id} 断开连接`)
+        logger.info('DeviceManager', `[${id}] 断开连接`)
       }
       catch (error) {
-        console.error(`[DeviceManager] 设备 ${id} 断开连接失败:`, error)
+        logger.error('DeviceManager', `[${id}] 断开连接失败:`, error)
       }
     })
 
@@ -231,7 +234,7 @@ export class DeviceManager extends EventEmitter {
     })
 
     if (failedConfigs.length > 0) {
-      console.log(`[DeviceManager] 尝试重新连接 ${failedConfigs.length} 个失败的设备`)
+      logger.info('DeviceManager', `尝试重新连接 ${failedConfigs.length} 个失败的设备`)
       const reconnectPromises = failedConfigs.map(config => this.initializeDevice(config))
       await Promise.allSettled(reconnectPromises)
     }
@@ -244,23 +247,23 @@ export class DeviceManager extends EventEmitter {
     const attempts = this.reconnectAttempts.get(deviceId) || 0
 
     if (attempts >= this.maxReconnectAttempts) {
-      console.error(`[DeviceManager] 设备 ${deviceId} 重连次数已达上限 (${this.maxReconnectAttempts})，停止重连`)
+      logger.error('DeviceManager', `[${deviceId}] 重连次数已达上限 (${this.maxReconnectAttempts})，停止重连`)
       this.reconnectAttempts.delete(deviceId)
       return
     }
 
     const delay = this.reconnectDelay * 2 ** attempts // 指数退避
-    console.log(`[DeviceManager] 将在 ${delay}ms 后尝试重连设备 ${deviceId} (第 ${attempts + 1} 次)`)
+    logger.info('DeviceManager', `将在 ${delay}ms 后尝试重连设备 ${deviceId} (第 ${attempts + 1} 次)`)
 
     const timer = setTimeout(async () => {
       try {
-        console.log(`[DeviceManager] 开始重连设备 ${deviceId}`)
+        logger.info('DeviceManager', `开始重连设备 ${deviceId}`)
         await this.initializeDevice(config)
         this.reconnectAttempts.delete(deviceId)
-        console.log(`[DeviceManager] 设备 ${deviceId} 重连成功`)
+        logger.info('DeviceManager', `设备 ${deviceId} 重连成功`)
       }
       catch (error) {
-        console.error(`[DeviceManager] 设备 ${deviceId} 重连失败:`, error)
+        logger.error('DeviceManager', `[${deviceId}] 重连失败:`, error)
         this.reconnectAttempts.set(deviceId, attempts + 1)
         this.scheduleReconnect(config, deviceId)
       }
@@ -276,7 +279,7 @@ export class DeviceManager extends EventEmitter {
    */
   private cancelAllReconnectTimers() {
     this.reconnectTimers.forEach((timer, deviceId) => {
-      console.log(`[DeviceManager] 取消设备 ${deviceId} 的重连定时器`)
+      logger.info('DeviceManager', `取消设备 ${deviceId} 的重连定时器`)
       clearTimeout(timer)
     })
     this.reconnectTimers.clear()

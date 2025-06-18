@@ -3,6 +3,9 @@ import fs from 'fs'
 import path from 'path'
 import process from 'process'
 import { z } from 'zod'
+import { getLogger } from './logger'
+
+const logger = getLogger()
 
 // 配置文件模式定义
 const DeviceConfigSchema = z.object({
@@ -107,17 +110,17 @@ export class ConfigManager {
         const configContent = fs.readFileSync(this.configPath, 'utf-8')
         const jsonConfig = JSON.parse(configContent)
         const validatedConfig = AppConfigSchema.parse(jsonConfig)
-        console.log(`[ConfigManager] 从配置文件加载配置: ${this.configPath}`)
+        logger.info('ConfigManager', `从配置文件加载配置: ${this.configPath}`)
         return validatedConfig
       }
 
       // 如果没有配置文件，创建默认配置文件
-      console.log('[ConfigManager] 未找到配置文件，创建默认配置')
+      logger.info('ConfigManager', '未找到配置文件，创建默认配置')
       this.saveConfig(DEFAULT_CONFIG)
       return DEFAULT_CONFIG
     }
     catch (error) {
-      console.error('[ConfigManager] 加载配置失败，使用默认配置:', error)
+      logger.error('ConfigManager', '加载配置失败，使用默认配置:', error)
       return DEFAULT_CONFIG
     }
   }
@@ -129,10 +132,10 @@ export class ConfigManager {
     try {
       const configContent = JSON.stringify(config, null, 2)
       fs.writeFileSync(this.configPath, configContent, 'utf-8')
-      console.log(`[ConfigManager] 配置已保存到: ${this.configPath}`)
+      logger.info('ConfigManager', `配置已保存到: ${this.configPath}`)
     }
     catch (error) {
-      console.error('[ConfigManager] 保存配置失败:', error)
+      logger.error('ConfigManager', '保存配置失败:', error)
     }
   }
 
