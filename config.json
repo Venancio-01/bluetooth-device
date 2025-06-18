@@ -20,7 +20,7 @@
   },
   "serialTransport": {
     "type": "serial",
-    "serialPath": "/dev/ttyS1",
+    "serialPath": "/dev/ttyS3",
     "baudRate": 115200,
     "dataBits": 8,
     "stopBits": 1,
