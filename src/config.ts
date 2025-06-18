@@ -96,6 +96,8 @@ export class ConfigManager {
       return process.env['CONFIG_PATH']
     }
 
+    console.log('path.join(process.cwd(), "config.json")', path.join(process.cwd(), 'config.json'))
+
     // 默认配置文件路径
     return path.join(process.cwd(), 'config.json')
   }
