@@ -3,6 +3,7 @@ import type { ITransport, ResponseCallback } from './transport'
 import { EventEmitter } from 'events'
 import { ReadlineParser } from '@serialport/parser-readline'
 import { SerialPort } from 'serialport'
+import { parseJSONMessage } from './communication'
 import { getLogger } from './logger'
 
 const logger = getLogger()
@@ -64,7 +65,7 @@ export class SerialTransport extends EventEmitter implements ITransport {
       this.port.write(dataWithNewline, (err) => {
         if (err) {
           logger.error('SerialTransport', '发送数据失败:', err)
-          this.emit('error', err)
+          this.emit('error', `发送数据失败: ${err.message}`)
         }
         else {
           logger.debug('SerialTransport', '发送数据:', data)
@@ -73,7 +74,7 @@ export class SerialTransport extends EventEmitter implements ITransport {
     }
     catch (error) {
       logger.error('SerialTransport', '发送数据异常:', error)
-      this.emit('error', error)
+      this.emit('error', `发送数据异常: ${error instanceof Error ? error.message : String(error)}`)
     }
   }
 
@@ -107,7 +108,7 @@ export class SerialTransport extends EventEmitter implements ITransport {
         this.port.on('error', (err) => {
           logger.error('SerialTransport', '串口错误:', err)
           this.isConnected = false
-          this.emit('error', err)
+          this.emit('error', `串口错误: ${err.message}`)
           reject(err)
         })
 
@@ -121,14 +122,7 @@ export class SerialTransport extends EventEmitter implements ITransport {
         // 监听数据接收事件
         this.parser.on('data', (data: string) => {
           logger.debug('SerialTransport', '接收数据:', data)
-          try {
-            const message = JSON.parse(data)
-            this.handleReceivedData(message)
-          }
-          catch (error) {
-            logger.error('SerialTransport', '处理接收数据失败:', error)
-            this.emit('error', error)
-          }
+          this.handleReceivedData(data)
         })
 
         // 打开串口
@@ -162,19 +156,22 @@ export class SerialTransport extends EventEmitter implements ITransport {
   /**
    * 处理接收到的数据
    */
-  private handleReceivedData(data: any): void {
-    try {
-      // 创建响应回调函数
-      const responseCallback: ResponseCallback = (response: string) => {
-        this.send(response)
-      }
+  private handleReceivedData(data: string): void {
+    // 创建响应回调函数
+    const responseCallback: ResponseCallback = (response: string) => {
+      this.send(response)
+    }
 
-      // 触发数据事件，传递给业务层处理
-      this.emit('data', data, responseCallback)
+    const requestPayload = parseJSONMessage(data)
+
+    if (!requestPayload) {
+      logger.warn('SerialTransport', '接收到的数据格式不正确:', data)
+      this.emit('error', `接收到的数据格式不正确: ${data}`, responseCallback)
+      return
     }
-    catch (error) {
-      logger.error('SerialTransport', '处理接收数据失败:', error)
-    }
+
+    // 触发数据事件，传递给业务层处理
+    this.emit('data', requestPayload, responseCallback)
   }
 
   /**

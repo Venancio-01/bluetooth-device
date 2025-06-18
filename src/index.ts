@@ -5,10 +5,9 @@ import {
   createDeviceEvent,
   createErrorResponse,
   createHeartbeatEvent,
-  createSimpleErrorResponse,
   createStatusResponse,
-  ErrorCode,
   parseRequestData,
+  type RequestPayload,
 } from './communication'
 import { getConfigManager } from './config'
 import { DeviceManager } from './device-manager'
@@ -25,43 +24,28 @@ let heartbeatTimer: NodeJS.Timeout | null = null
  * @param message JSON 字符串消息
  * @param cb      响应回调
  */
-async function handleMessage(message: any, cb: ResponseCallback) {
+async function handleMessage(message: RequestPayload, cb: ResponseCallback) {
   const request = message
-  console.log('request', request)
   if (!request) {
-    const errorResponse = createErrorResponse({
-      code: ErrorCode.INVALID_MESSAGE_FORMAT,
-      message: 'Invalid message format',
-      suggestion: 'Please check the message format and ensure it follows the protocol specification',
-    })
+    const errorResponse = createErrorResponse('Invalid message format')
     return cb(errorResponse)
   }
 
   try {
     switch (request.c) {
-      case '1':
+      case CommandCode.START:
         return cb(await onReceiveStart(request.d))
 
-      case '2':
+      case CommandCode.STOP:
         return cb(await onReceiveStop())
 
       default:
-        return cb(createErrorResponse({
-          code: ErrorCode.UNKNOWN_COMMAND,
-          message: 'Unknown command',
-          suggestion: 'Please check the command code and ensure it is supported',
-          context: { receivedCommand: request.c },
-        }))
+        return cb(createErrorResponse('Unknown command'))
     }
   }
   catch (error: any) {
     console.error('处理指令时发生错误:', error)
-    return cb(createErrorResponse({
-      code: ErrorCode.COMMAND_EXECUTION_FAILED,
-      message: error.message || 'Failed to execute command',
-      suggestion: 'Please check the device status and try again',
-      context: { command: request.c, error: error.message },
-    }))
+    return cb(createErrorResponse(error.message || 'Failed to execute command'))
   }
 }
 
@@ -149,6 +133,12 @@ async function main() {
     handleMessage(message, cb)
   })
 
+  // 监听传输层错误事件
+  transport.on('error', (error, cb) => {
+    logger.error('Main', '传输层错误:', error)
+    cb(createErrorResponse(error))
+  })
+
   // 监听设备管理器的设备事件，并通过传输层上报
   deviceManager.on('device', (device) => {
     logger.info('Main', '设备上报:', device)
@@ -198,8 +188,6 @@ async function main() {
   }
 }
 
-
-
 /**
  * 处理启动扫描指令
  * @param requestData 请求数据
@@ -219,12 +207,7 @@ async function onReceiveStart(requestData: unknown) {
   }
   catch (error: any) {
     logger.error('Main', '启动扫描失败:', error)
-    return createErrorResponse({
-      code: ErrorCode.SCAN_START_FAILED,
-      message: error.message || 'Failed to start scan',
-      suggestion: 'Please check device connections and try again',
-      context: { rssi, error: error.message },
-    })
+    return createErrorResponse(error.message || 'Failed to start scan')
   }
 }
 
@@ -242,12 +225,7 @@ async function onReceiveStop() {
   }
   catch (error: any) {
     logger.error('Main', '停止扫描失败:', error)
-    return createErrorResponse({
-      code: ErrorCode.SCAN_STOP_FAILED,
-      message: error.message || 'Failed to stop scan',
-      suggestion: 'Please check device connections and try again',
-      context: { error: error.message },
-    })
+    return createErrorResponse(error.message || 'Failed to stop scan')
   }
 }
 

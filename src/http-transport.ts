@@ -1,7 +1,9 @@
 import type { Server } from 'http'
 import type { ITransport, ResponseCallback } from './transport'
+import type { RequestPayload } from './communication'
 import { EventEmitter } from 'events'
 import express from 'express'
+import { parseJSONMessage } from './communication'
 
 export class HttpTransport extends EventEmitter implements ITransport {
   private server: Server | null = null
@@ -54,9 +56,27 @@ export class HttpTransport extends EventEmitter implements ITransport {
         const cb: ResponseCallback = (response) => {
           res.status(200).send(response)
         }
-        this.emit('data', req.body, cb)
+
+        // 解析请求数据为 RequestPayload 类型
+        const requestPayload = parseJSONMessage(JSON.stringify(req.body))
+        if (!requestPayload) {
+          this.emit('error', '请求数据格式不正确')
+          res.status(400).json({
+            t: 2, // ERROR
+            d: {
+              code: 'E400',
+              msg: 'Invalid request format',
+              suggestion: 'Please check the request format and try again',
+            },
+          })
+          return
+        }
+
+        this.emit('data', requestPayload, cb)
       }
       catch (error: any) {
+        const errorMessage = `HTTP传输层处理请求异常: ${error.message}`
+        this.emit('error', errorMessage)
         res.status(500).json({
           t: 2, // ERROR
           d: {

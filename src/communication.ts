@@ -53,53 +53,18 @@ export function createStatusResponse(data: Record<string, unknown>): string {
   return JSON.stringify(payload)
 }
 
-// 错误代码定义
-export const ErrorCode = {
-  INVALID_MESSAGE_FORMAT: 'E001',
-  UNKNOWN_COMMAND: 'E002',
-  COMMAND_EXECUTION_FAILED: 'E003',
-  DEVICE_NOT_FOUND: 'E004',
-  DEVICE_BUSY: 'E005',
-  SCAN_START_FAILED: 'E006',
-  SCAN_STOP_FAILED: 'E007',
-  INTERNAL_ERROR: 'E999',
-} as const
-
-// 错误信息接口
-export interface ErrorInfo {
-  code: string
-  message: string
-  suggestion?: string
-  context?: Record<string, unknown>
-}
-
 /**
  * 创建一个标准的错误响应
- * @param errorInfo 错误信息对象
+ * @param message 错误消息
  */
-export function createErrorResponse(errorInfo: ErrorInfo): string {
+export function createErrorResponse(message: string): string {
   const payload: ResponsePayload = {
     t: EventTypeCode.ERROR,
     d: {
-      code: errorInfo.code,
-      msg: errorInfo.message,
-      suggestion: errorInfo.suggestion,
-      context: errorInfo.context,
+      msg: message,
     },
   }
   return JSON.stringify(payload)
-}
-
-/**
- * 创建一个简单的错误响应（向后兼容）
- * @param message 错误消息
- * @param code 错误代码，默认为内部错误
- */
-export function createSimpleErrorResponse(message: string, code: string = ErrorCode.INTERNAL_ERROR): string {
-  return createErrorResponse({
-    code,
-    message,
-  })
 }
 
 /**

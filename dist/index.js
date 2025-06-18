@@ -31,24 +31,11 @@ function createStatusResponse(data) {
   };
   return JSON.stringify(payload);
 }
-var ErrorCode = {
-  INVALID_MESSAGE_FORMAT: "E001",
-  UNKNOWN_COMMAND: "E002",
-  COMMAND_EXECUTION_FAILED: "E003",
-  DEVICE_NOT_FOUND: "E004",
-  DEVICE_BUSY: "E005",
-  SCAN_START_FAILED: "E006",
-  SCAN_STOP_FAILED: "E007",
-  INTERNAL_ERROR: "E999"
-};
-function createErrorResponse(errorInfo) {
+function createErrorResponse(message) {
   const payload = {
     t: EventTypeCode.ERROR,
     d: {
-      code: errorInfo.code,
-      msg: errorInfo.message,
-      suggestion: errorInfo.suggestion,
-      context: errorInfo.context
+      msg: message
     }
   };
   return JSON.stringify(payload);
@@ -66,6 +53,20 @@ function createHeartbeatEvent(data) {
     d: data
   };
   return JSON.stringify(payload);
+}
+function parseJSONMessage(message) {
+  try {
+    const json = JSON.parse(message);
+    const validation = RequestSchema.safeParse(json);
+    if (validation.success) {
+      return validation.data;
+    }
+    console.error("Invalid message format:", validation.error);
+    return null;
+  } catch (error) {
+    console.error("Failed to parse JSON message:", error);
+    return null;
+  }
 }
 function parseRequestData(data) {
   try {
@@ -834,8 +835,24 @@ var HttpTransport = class extends EventEmitter3 {
         const cb = (response) => {
           res.status(200).send(response);
         };
-        this.emit("data", req.body, cb);
+        const requestPayload = parseJSONMessage(JSON.stringify(req.body));
+        if (!requestPayload) {
+          this.emit("error", "\u8BF7\u6C42\u6570\u636E\u683C\u5F0F\u4E0D\u6B63\u786E");
+          res.status(400).json({
+            t: 2,
+            // ERROR
+            d: {
+              code: "E400",
+              msg: "Invalid request format",
+              suggestion: "Please check the request format and try again"
+            }
+          });
+          return;
+        }
+        this.emit("data", requestPayload, cb);
       } catch (error) {
+        const errorMessage = `HTTP\u4F20\u8F93\u5C42\u5904\u7406\u8BF7\u6C42\u5F02\u5E38: ${error.message}`;
+        this.emit("error", errorMessage);
         res.status(500).json({
           t: 2,
           // ERROR
@@ -1009,14 +1026,14 @@ var SerialTransport = class extends EventEmitter4 {
       this.port.write(dataWithNewline, (err) => {
         if (err) {
           logger.error("SerialTransport", "\u53D1\u9001\u6570\u636E\u5931\u8D25:", err);
-          this.emit("error", err);
+          this.emit("error", `\u53D1\u9001\u6570\u636E\u5931\u8D25: ${err.message}`);
         } else {
           logger.debug("SerialTransport", "\u53D1\u9001\u6570\u636E:", data);
         }
       });
     } catch (error) {
       logger.error("SerialTransport", "\u53D1\u9001\u6570\u636E\u5F02\u5E38:", error);
-      this.emit("error", error);
+      this.emit("error", `\u53D1\u9001\u6570\u636E\u5F02\u5E38: ${error instanceof Error ? error.message : String(error)}`);
     }
   };
   /**
@@ -1043,7 +1060,7 @@ var SerialTransport = class extends EventEmitter4 {
         this.port.on("error", (err) => {
           logger.error("SerialTransport", "\u4E32\u53E3\u9519\u8BEF:", err);
           this.isConnected = false;
-          this.emit("error", err);
+          this.emit("error", `\u4E32\u53E3\u9519\u8BEF: ${err.message}`);
           reject(err);
         });
         this.port.on("close", () => {
@@ -1053,13 +1070,7 @@ var SerialTransport = class extends EventEmitter4 {
         });
         this.parser.on("data", (data) => {
           logger.debug("SerialTransport", "\u63A5\u6536\u6570\u636E:", data);
-          try {
-            const message = JSON.parse(data);
-            this.handleReceivedData(message);
-          } catch (error) {
-            logger.error("SerialTransport", "\u5904\u7406\u63A5\u6536\u6570\u636E\u5931\u8D25:", error);
-            this.emit("error", error);
-          }
+          this.handleReceivedData(data);
         });
         this.port.open();
       } catch (error) {
@@ -1088,14 +1099,16 @@ var SerialTransport = class extends EventEmitter4 {
    * 处理接收到的数据
    */
   handleReceivedData(data) {
-    try {
-      const responseCallback = (response) => {
-        this.send(response);
-      };
-      this.emit("data", data, responseCallback);
-    } catch (error) {
-      logger.error("SerialTransport", "\u5904\u7406\u63A5\u6536\u6570\u636E\u5931\u8D25:", error);
+    const responseCallback = (response) => {
+      this.send(response);
+    };
+    const requestPayload = parseJSONMessage(data);
+    if (!requestPayload) {
+      logger.warn("SerialTransport", "\u63A5\u6536\u5230\u7684\u6570\u636E\u683C\u5F0F\u4E0D\u6B63\u786E:", data);
+      this.emit("error", `\u63A5\u6536\u5230\u7684\u6570\u636E\u683C\u5F0F\u4E0D\u6B63\u786E: ${data}`, responseCallback);
+      return;
     }
+    this.emit("data", requestPayload, responseCallback);
   }
   /**
    * 安排重连
@@ -1141,37 +1154,22 @@ var transport = null;
 var heartbeatTimer = null;
 async function handleMessage(message, cb) {
   const request = message;
-  console.log("request", request);
   if (!request) {
-    const errorResponse = createErrorResponse({
-      code: ErrorCode.INVALID_MESSAGE_FORMAT,
-      message: "Invalid message format",
-      suggestion: "Please check the message format and ensure it follows the protocol specification"
-    });
+    const errorResponse = createErrorResponse("Invalid message format");
     return cb(errorResponse);
   }
   try {
     switch (request.c) {
-      case "1":
+      case CommandCode.START:
         return cb(await onReceiveStart(request.d));
-      case "2":
+      case CommandCode.STOP:
         return cb(await onReceiveStop());
       default:
-        return cb(createErrorResponse({
-          code: ErrorCode.UNKNOWN_COMMAND,
-          message: "Unknown command",
-          suggestion: "Please check the command code and ensure it is supported",
-          context: { receivedCommand: request.c }
-        }));
+        return cb(createErrorResponse("Unknown command"));
     }
   } catch (error) {
     console.error("\u5904\u7406\u6307\u4EE4\u65F6\u53D1\u751F\u9519\u8BEF:", error);
-    return cb(createErrorResponse({
-      code: ErrorCode.COMMAND_EXECUTION_FAILED,
-      message: error.message || "Failed to execute command",
-      suggestion: "Please check the device status and try again",
-      context: { command: request.c, error: error.message }
-    }));
+    return cb(createErrorResponse(error.message || "Failed to execute command"));
   }
 }
 function startHeartbeat() {
@@ -1232,6 +1230,10 @@ async function main() {
   transport.on("data", (message, cb) => {
     handleMessage(message, cb);
   });
+  transport.on("error", (error, cb) => {
+    logger2.error("Main", "\u4F20\u8F93\u5C42\u9519\u8BEF:", error);
+    cb(createErrorResponse(error));
+  });
   deviceManager.on("device", (device) => {
     logger2.info("Main", "\u8BBE\u5907\u4E0A\u62A5:", device);
     const event = createDeviceEvent(device);
@@ -1277,12 +1279,7 @@ async function onReceiveStart(requestData) {
     return createStatusResponse({ msg: "Scan started" });
   } catch (error) {
     logger2.error("Main", "\u542F\u52A8\u626B\u63CF\u5931\u8D25:", error);
-    return createErrorResponse({
-      code: ErrorCode.SCAN_START_FAILED,
-      message: error.message || "Failed to start scan",
-      suggestion: "Please check device connections and try again",
-      context: { rssi, error: error.message }
-    });
+    return createErrorResponse(error.message || "Failed to start scan");
   }
 }
 async function onReceiveStop() {
@@ -1293,12 +1290,7 @@ async function onReceiveStop() {
     return createStatusResponse({ msg: "Scan stopped" });
   } catch (error) {
     logger2.error("Main", "\u505C\u6B62\u626B\u63CF\u5931\u8D25:", error);
-    return createErrorResponse({
-      code: ErrorCode.SCAN_STOP_FAILED,
-      message: error.message || "Failed to stop scan",
-      suggestion: "Please check device connections and try again",
-      context: { error: error.message }
-    });
+    return createErrorResponse(error.message || "Failed to stop scan");
   }
 }
 process2.on("SIGINT", async () => {
