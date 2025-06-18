@@ -62,7 +62,7 @@ export class SerialTransport extends EventEmitter implements ITransport {
 
     try {
       // 添加换行符确保数据完整传输
-      const dataWithNewline = data.endsWith('\n') ? data : `${data}\n`
+      const dataWithNewline = data.endsWith('\r\n') ? data : `${data}\r\n`
       this.port.write(dataWithNewline, (err) => {
         if (err) {
           logger.error('SerialTransport', '发送数据失败:', err)

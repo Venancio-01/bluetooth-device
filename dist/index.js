@@ -1028,7 +1028,7 @@ var SerialTransport = class extends EventEmitter4 {
       return;
     }
     try {
-      const dataWithNewline = data.endsWith("\n") ? data : `${data}
+      const dataWithNewline = data.endsWith("\r\n") ? data : `${data}\r
 `;
       this.port.write(dataWithNewline, (err) => {
         if (err) {
