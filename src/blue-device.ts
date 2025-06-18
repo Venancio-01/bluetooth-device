@@ -191,19 +191,19 @@ export class BlueDevice extends EventEmitter {
 
     try {
       // 重启设备
-      await this.sendAndSleep(buildRestartCommand(), 1000)
-
-      // 进入AT命令模式
-      await this.sendAndSleep(buildEnterCommandMode(), 1000)
-
-      // 设置设备为单主角色
-      await this.sendAndSleep(buildSetRoleCommand(), 1000)
-
-      // 重启设备
       await this.sendAndSleep(buildRestartCommand(), 3000)
 
       // 进入AT命令模式
-      await this.sendAndSleep(buildEnterCommandMode(), 2000)
+      await this.sendAndSleep(buildEnterCommandMode(), 500)
+
+      // 设置设备为单主角色
+      await this.sendAndSleep(buildSetRoleCommand(), 500)
+
+      // 重启设备
+      await this.sendAndSleep(buildRestartCommand(), 2000)
+
+      // 进入AT命令模式
+      await this.sendAndSleep(buildEnterCommandMode(), 500)
 
       this.initializeState = 'initialized'
       console.log(`[${this.deviceId}] 设备初始化完成`)

@@ -486,11 +486,11 @@ var BlueDevice = class extends EventEmitter {
     console.log(`[${this.deviceId}] \u5F00\u59CB\u521D\u59CB\u5316\u8BBE\u5907`);
     this.initializeState = "initializing";
     try {
-      await this.sendAndSleep(buildRestartCommand(), 1e3);
-      await this.sendAndSleep(buildEnterCommandMode(), 1e3);
-      await this.sendAndSleep(buildSetRoleCommand(), 1e3);
       await this.sendAndSleep(buildRestartCommand(), 3e3);
-      await this.sendAndSleep(buildEnterCommandMode(), 2e3);
+      await this.sendAndSleep(buildEnterCommandMode(), 500);
+      await this.sendAndSleep(buildSetRoleCommand(), 500);
+      await this.sendAndSleep(buildRestartCommand(), 2e3);
+      await this.sendAndSleep(buildEnterCommandMode(), 500);
       this.initializeState = "initialized";
       console.log(`[${this.deviceId}] \u8BBE\u5907\u521D\u59CB\u5316\u5B8C\u6210`);
     } catch (error) {
