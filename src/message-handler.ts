@@ -83,14 +83,24 @@ export class MessageHandler {
 
     logger.info('MessageHandler', '收到启动扫描指令', { rssi })
 
+    // try {
+    //   await this.deviceManager.startScan(rssi)
+    //   logger.info('MessageHandler', '所有设备开始扫描')
+    //   return createStatusResponse({ msg: 'Scan started' })
+    // }
+    // catch (error: any) {
+    //   logger.error('MessageHandler', '启动扫描失败:', error)
+    //   return createErrorResponse(error.message || 'Failed to start scan')
+    // }
+
     try {
-      await this.deviceManager.startScan(rssi)
-      logger.info('MessageHandler', '所有设备开始扫描')
-      return createStatusResponse({ msg: 'Scan started' })
+      await this.deviceManager.startReport()
+      logger.info('MessageHandler', '所有设备开始上报')
+      return createStatusResponse({ msg: 'Report started' })
     }
     catch (error: any) {
-      logger.error('MessageHandler', '启动扫描失败:', error)
-      return createErrorResponse(error.message || 'Failed to start scan')
+      logger.error('MessageHandler', '启动上报失败:', error)
+      return createErrorResponse(error.message || 'Failed to start report')
     }
   }
 
@@ -99,14 +109,24 @@ export class MessageHandler {
    * @returns 停止扫描响应
    */
   private async handleStopCommand(): Promise<string> {
+    // try {
+    //   await this.deviceManager.stopScan()
+    //   logger.info('MessageHandler', '所有设备停止扫描')
+    //   return createStatusResponse({ msg: 'Scan stopped' })
+    // }
+    // catch (error: any) {
+    //   logger.error('MessageHandler', '停止扫描失败:', error)
+    //   return createErrorResponse(error.message || 'Failed to stop scan')
+    // }
+
     try {
-      await this.deviceManager.stopScan()
-      logger.info('MessageHandler', '所有设备停止扫描')
-      return createStatusResponse({ msg: 'Scan stopped' })
+      await this.deviceManager.stopReport()
+      logger.info('MessageHandler', '所有设备停止上报')
+      return createStatusResponse({ msg: 'Report stopped' })
     }
     catch (error: any) {
-      logger.error('MessageHandler', '停止扫描失败:', error)
-      return createErrorResponse(error.message || 'Failed to stop scan')
+      logger.error('MessageHandler', '停止上报失败:', error)
+      return createErrorResponse(error.message || 'Failed to stop report')
     }
   }
 }

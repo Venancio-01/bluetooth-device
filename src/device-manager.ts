@@ -157,7 +157,7 @@ export class DeviceManager extends EventEmitter {
         throw new Error(`设备 ${deviceId} 不存在`)
       }
       await device.startScan(rssi)
-      logger.info('DeviceManager', `[${deviceId}] 开始扫描`)
+      logger.info('DeviceManager', `[${deviceId}] 开始上报`)
     }
     else {
       // 启动所有设备的扫描
@@ -196,6 +196,62 @@ export class DeviceManager extends EventEmitter {
         }
         catch (error) {
           logger.error('DeviceManager', `[${id}] 停止扫描失败:`, error)
+        }
+      })
+      await Promise.allSettled(stopPromises)
+    }
+  }
+
+  /**
+   * 启动上报 - 支持指定设备或所有设备
+   */
+  async startReport(deviceId?: string): Promise<void> {
+    if (deviceId) {
+      // 启动指定设备的扫描
+      const device = this.devices.get(deviceId)
+      if (!device) {
+        throw new Error(`设备 ${deviceId} 不存在`)
+      }
+      await device.startReport()
+      logger.info('DeviceManager', `[${deviceId}] 开始上报`)
+    }
+    else {
+      // 启动所有设备的扫描
+      const startPromises = Array.from(this.devices.entries()).map(async ([id, device]) => {
+        try {
+          await device.startReport()
+          logger.info('DeviceManager', `[${id}] 开始上报`)
+        }
+        catch (error) {
+          logger.error('DeviceManager', `[${id}] 启动上报失败:`, error)
+        }
+      })
+      await Promise.allSettled(startPromises)
+    }
+  }
+
+  /**
+   * 停止上报 - 支持指定设备或所有设备
+   */
+  async stopReport(deviceId?: string): Promise<void> {
+    if (deviceId) {
+      // 停止指定设备的扫描
+      const device = this.devices.get(deviceId)
+      if (!device) {
+        throw new Error(`设备 ${deviceId} 不存在`)
+      }
+      await device.stopReport()
+      logger.info('DeviceManager', `[${deviceId}] 停止上报`)
+    }
+    else {
+      // 停止所有设备的扫描
+      const stopPromises = Array.from(this.devices.entries()).map(async ([id, device]) => {
+        try {
+          await device.stopReport()
+          logger.info('DeviceManager', `[${id}] 停止上报`)
+        }
+        catch (error) {
+          logger.error('DeviceManager', `[${id}] 停止上报失败:`, error)
         }
       })
       await Promise.allSettled(stopPromises)

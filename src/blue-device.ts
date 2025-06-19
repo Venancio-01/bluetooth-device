@@ -19,6 +19,11 @@ const MANUFACTURER_DICT = {
   '00EO': 'Google',
 } as const
 
+interface DetectionResult {
+  mf: string
+  timestamp: number
+}
+
 export class BlueDevice extends EventEmitter {
   private port: SerialPort | null = null
   private initializeState: 'uninitialized' | 'initializing' | 'initialized' = 'uninitialized'
@@ -28,6 +33,9 @@ export class BlueDevice extends EventEmitter {
   private readonly deviceId: string
   private readonly reportInterval: number
   private reportTimer: NodeJS.Timeout | null = null
+  private enableReport = false
+  // 检测结果列表
+  private detectionResultList: DetectionResult[] = []
 
   constructor(serialPath: string = '/dev/ttyUSB0', deviceId?: string, reportInterval: number = 5000) {
     super()
@@ -152,21 +160,31 @@ export class BlueDevice extends EventEmitter {
     const splitStrIndex = advStr.indexOf('FF')
     const splitStr = advStr.substring(splitStrIndex, splitStrIndex + 2)
 
-    if (splitStr === 'FF') {
-      const targetStr = advStr.substring(splitStrIndex + 4, splitStrIndex + 6) + advStr.substring(splitStrIndex + 2, splitStrIndex + 4)
-      const manufacturer = MANUFACTURER_DICT[targetStr as keyof typeof MANUFACTURER_DICT]
-      if (manufacturer) {
-        const hasDevice = this.deleteDeviceList.has(targetStr)
+    if (splitStr !== 'FF') return
 
-        if (!hasDevice) {
-          logger.info('BlueDevice', `[${this.deviceId}] manufacturer`, manufacturer)
-          this.emit('device', {
-            mf: manufacturer,
-          })
-          this.deleteDeviceList.add(targetStr)
-        }
-      }
-    }
+    const targetStr = advStr.substring(splitStrIndex + 4, splitStrIndex + 6) + advStr.substring(splitStrIndex + 2, splitStrIndex + 4)
+    const manufacturer = MANUFACTURER_DICT[targetStr as keyof typeof MANUFACTURER_DICT]
+    // 如果厂商不存在，则不处理
+    if (!manufacturer) return
+
+    // 添加检测结果
+    this.addDetectionResult({
+      mf: manufacturer,
+      timestamp: Date.now(),
+    })
+
+    const hasDevice = this.deleteDeviceList.has(targetStr)
+    // 如果设备已被检测，则不处理
+    if (hasDevice) return
+
+    // 如果未开启上报，则不处理
+    if (!this.enableReport) return
+
+    logger.info('BlueDevice', `[${this.deviceId}] manufacturer`, manufacturer)
+    this.emit('device', {
+      mf: manufacturer,
+    })
+    this.deleteDeviceList.add(targetStr)
   }
 
   /**
@@ -279,6 +297,30 @@ export class BlueDevice extends EventEmitter {
       this.emit('error', error)
       throw error
     }
+  }
+
+  async startReport() {
+    this.enableReport = true
+    const manufacturer = [...new Set(this.detectionResultList.map(item => item.mf))].join(',')
+    if (!manufacturer) return
+    logger.info('BlueDevice', `[${this.deviceId}] 缓冲区检测结果:`, manufacturer)
+
+    this.emit('device', {
+      mf: manufacturer,
+    })
+  }
+
+  async stopReport() {
+    this.enableReport = false
+  }
+
+  addDetectionResult(result: DetectionResult) {
+    // 最大保留时间
+    const maxRetentionTime = 1000
+    // 删除过期数据
+    this.detectionResultList = this.detectionResultList.filter(item => Date.now() - item.timestamp < maxRetentionTime)
+    // 添加新数据
+    this.detectionResultList.push(result)
   }
 
   /**

@@ -365,6 +365,9 @@ var BlueDevice = class extends EventEmitter {
   deviceId;
   reportInterval;
   reportTimer = null;
+  enableReport = false;
+  // 检测结果列表
+  detectionResultList = [];
   constructor(serialPath = "/dev/ttyUSB0", deviceId, reportInterval = 5e3) {
     super();
     this.port = null;
@@ -469,20 +472,22 @@ var BlueDevice = class extends EventEmitter {
     }
     const splitStrIndex = advStr.indexOf("FF");
     const splitStr = advStr.substring(splitStrIndex, splitStrIndex + 2);
-    if (splitStr === "FF") {
-      const targetStr = advStr.substring(splitStrIndex + 4, splitStrIndex + 6) + advStr.substring(splitStrIndex + 2, splitStrIndex + 4);
-      const manufacturer = MANUFACTURER_DICT[targetStr];
-      if (manufacturer) {
-        const hasDevice = this.deleteDeviceList.has(targetStr);
-        if (!hasDevice) {
-          logger2.info("BlueDevice", `[${this.deviceId}] manufacturer`, manufacturer);
-          this.emit("device", {
-            mf: manufacturer
-          });
-          this.deleteDeviceList.add(targetStr);
-        }
-      }
-    }
+    if (splitStr !== "FF") return;
+    const targetStr = advStr.substring(splitStrIndex + 4, splitStrIndex + 6) + advStr.substring(splitStrIndex + 2, splitStrIndex + 4);
+    const manufacturer = MANUFACTURER_DICT[targetStr];
+    if (!manufacturer) return;
+    this.addDetectionResult({
+      mf: manufacturer,
+      timestamp: Date.now()
+    });
+    const hasDevice = this.deleteDeviceList.has(targetStr);
+    if (hasDevice) return;
+    if (!this.enableReport) return;
+    logger2.info("BlueDevice", `[${this.deviceId}] manufacturer`, manufacturer);
+    this.emit("device", {
+      mf: manufacturer
+    });
+    this.deleteDeviceList.add(targetStr);
   }
   /**
    * 发送数据并等待
@@ -563,6 +568,23 @@ var BlueDevice = class extends EventEmitter {
       this.emit("error", error);
       throw error;
     }
+  }
+  async startReport() {
+    this.enableReport = true;
+    const manufacturer = [...new Set(this.detectionResultList.map((item) => item.mf))].join(",");
+    if (!manufacturer) return;
+    logger2.info("BlueDevice", `[${this.deviceId}] \u7F13\u51B2\u533A\u68C0\u6D4B\u7ED3\u679C:`, manufacturer);
+    this.emit("device", {
+      mf: manufacturer
+    });
+  }
+  async stopReport() {
+    this.enableReport = false;
+  }
+  addDetectionResult(result) {
+    const maxRetentionTime = 1e3;
+    this.detectionResultList = this.detectionResultList.filter((item) => Date.now() - item.timestamp < maxRetentionTime);
+    this.detectionResultList.push(result);
   }
   /**
    * 重启设备
@@ -704,7 +726,7 @@ var DeviceManager = class extends EventEmitter2 {
         throw new Error(`\u8BBE\u5907 ${deviceId} \u4E0D\u5B58\u5728`);
       }
       await device.startScan(rssi);
-      logger3.info("DeviceManager", `[${deviceId}] \u5F00\u59CB\u626B\u63CF`);
+      logger3.info("DeviceManager", `[${deviceId}] \u5F00\u59CB\u4E0A\u62A5`);
     } else {
       const startPromises = Array.from(this.devices.entries()).map(async ([id, device]) => {
         try {
@@ -735,6 +757,52 @@ var DeviceManager = class extends EventEmitter2 {
           logger3.info("DeviceManager", `[${id}] \u505C\u6B62\u626B\u63CF`);
         } catch (error) {
           logger3.error("DeviceManager", `[${id}] \u505C\u6B62\u626B\u63CF\u5931\u8D25:`, error);
+        }
+      });
+      await Promise.allSettled(stopPromises);
+    }
+  }
+  /**
+   * 启动上报 - 支持指定设备或所有设备
+   */
+  async startReport(deviceId) {
+    if (deviceId) {
+      const device = this.devices.get(deviceId);
+      if (!device) {
+        throw new Error(`\u8BBE\u5907 ${deviceId} \u4E0D\u5B58\u5728`);
+      }
+      await device.startReport();
+      logger3.info("DeviceManager", `[${deviceId}] \u5F00\u59CB\u4E0A\u62A5`);
+    } else {
+      const startPromises = Array.from(this.devices.entries()).map(async ([id, device]) => {
+        try {
+          await device.startReport();
+          logger3.info("DeviceManager", `[${id}] \u5F00\u59CB\u4E0A\u62A5`);
+        } catch (error) {
+          logger3.error("DeviceManager", `[${id}] \u542F\u52A8\u4E0A\u62A5\u5931\u8D25:`, error);
+        }
+      });
+      await Promise.allSettled(startPromises);
+    }
+  }
+  /**
+   * 停止上报 - 支持指定设备或所有设备
+   */
+  async stopReport(deviceId) {
+    if (deviceId) {
+      const device = this.devices.get(deviceId);
+      if (!device) {
+        throw new Error(`\u8BBE\u5907 ${deviceId} \u4E0D\u5B58\u5728`);
+      }
+      await device.stopReport();
+      logger3.info("DeviceManager", `[${deviceId}] \u505C\u6B62\u4E0A\u62A5`);
+    } else {
+      const stopPromises = Array.from(this.devices.entries()).map(async ([id, device]) => {
+        try {
+          await device.stopReport();
+          logger3.info("DeviceManager", `[${id}] \u505C\u6B62\u4E0A\u62A5`);
+        } catch (error) {
+          logger3.error("DeviceManager", `[${id}] \u505C\u6B62\u4E0A\u62A5\u5931\u8D25:`, error);
         }
       });
       await Promise.allSettled(stopPromises);
@@ -1035,12 +1103,12 @@ var MessageHandler = class {
     const rssi = data?.rssi || "-60";
     logger6.info("MessageHandler", "\u6536\u5230\u542F\u52A8\u626B\u63CF\u6307\u4EE4", { rssi });
     try {
-      await this.deviceManager.startScan(rssi);
-      logger6.info("MessageHandler", "\u6240\u6709\u8BBE\u5907\u5F00\u59CB\u626B\u63CF");
-      return createStatusResponse({ msg: "Scan started" });
+      await this.deviceManager.startReport();
+      logger6.info("MessageHandler", "\u6240\u6709\u8BBE\u5907\u5F00\u59CB\u4E0A\u62A5");
+      return createStatusResponse({ msg: "Report started" });
     } catch (error) {
-      logger6.error("MessageHandler", "\u542F\u52A8\u626B\u63CF\u5931\u8D25:", error);
-      return createErrorResponse(error.message || "Failed to start scan");
+      logger6.error("MessageHandler", "\u542F\u52A8\u4E0A\u62A5\u5931\u8D25:", error);
+      return createErrorResponse(error.message || "Failed to start report");
     }
   }
   /**
@@ -1049,12 +1117,12 @@ var MessageHandler = class {
    */
   async handleStopCommand() {
     try {
-      await this.deviceManager.stopScan();
-      logger6.info("MessageHandler", "\u6240\u6709\u8BBE\u5907\u505C\u6B62\u626B\u63CF");
-      return createStatusResponse({ msg: "Scan stopped" });
+      await this.deviceManager.stopReport();
+      logger6.info("MessageHandler", "\u6240\u6709\u8BBE\u5907\u505C\u6B62\u4E0A\u62A5");
+      return createStatusResponse({ msg: "Report stopped" });
     } catch (error) {
-      logger6.error("MessageHandler", "\u505C\u6B62\u626B\u63CF\u5931\u8D25:", error);
-      return createErrorResponse(error.message || "Failed to stop scan");
+      logger6.error("MessageHandler", "\u505C\u6B62\u4E0A\u62A5\u5931\u8D25:", error);
+      return createErrorResponse(error.message || "Failed to stop report");
     }
   }
 };
