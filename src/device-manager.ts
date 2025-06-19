@@ -24,10 +24,12 @@ export class DeviceManager extends EventEmitter {
   private reconnectAttempts: Map<string, number> = new Map()
   private maxReconnectAttempts = 5
   private reconnectDelay = 10000 // 10秒
+  private defaultRssi: string = '-50'
 
-  constructor(deviceConfigs: DeviceConfig[] = []) {
+  constructor(deviceConfigs: DeviceConfig[] = [], defaultRssi: string = '-50') {
     super()
     this.deviceConfigs = deviceConfigs
+    this.defaultRssi = defaultRssi
   }
 
   /**
@@ -149,7 +151,7 @@ export class DeviceManager extends EventEmitter {
   /**
    * 启动扫描 - 支持指定设备或所有设备
    */
-  async startScan(rssi: string = '-60', deviceId?: string): Promise<void> {
+  async startScan(rssi: string = this.defaultRssi, deviceId?: string): Promise<void> {
     if (deviceId) {
       // 启动指定设备的扫描
       const device = this.devices.get(deviceId)

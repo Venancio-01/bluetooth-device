@@ -13,6 +13,7 @@
       "enabled": false
     }
   ],
+  "rssi": "-50",
   "reportInterval": 5000,
   "enabledTransports": "serial",
   "httpTransport": {

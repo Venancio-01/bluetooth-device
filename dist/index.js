@@ -137,6 +137,7 @@ var SerialTransportConfigSchema = z.object({
 });
 var AppConfigSchema = z.object({
   devices: z.array(DeviceConfigSchema),
+  rssi: z.string().optional().default("-50"),
   reportInterval: z.number().optional().default(5e3),
   serialTransport: SerialTransportConfigSchema.optional().default({ serialPath: "/dev/ttyUSB0", baudRate: 115200, dataBits: 8, stopBits: 1, parity: "none", timeout: 5e3 }),
   logging: z.object({
@@ -153,6 +154,7 @@ var DEFAULT_CONFIG = {
       enabled: true
     }
   ],
+  rssi: "-50",
   reportInterval: 5e3,
   serialTransport: {
     serialPath: "/dev/ttyUSB1",
@@ -483,7 +485,6 @@ var BlueDevice = class extends EventEmitter {
     const hasDevice = this.deleteDeviceList.has(targetStr);
     if (hasDevice) return;
     if (!this.enableReport) return;
-    logger2.info("BlueDevice", `[${this.deviceId}] manufacturer`, manufacturer);
     this.emit("device", {
       mf: manufacturer
     });
@@ -618,9 +619,11 @@ var DeviceManager = class extends EventEmitter2 {
   maxReconnectAttempts = 5;
   reconnectDelay = 1e4;
   // 10秒
-  constructor(deviceConfigs = []) {
+  defaultRssi = "-50";
+  constructor(deviceConfigs = [], defaultRssi = "-50") {
     super();
     this.deviceConfigs = deviceConfigs;
+    this.defaultRssi = defaultRssi;
   }
   /**
    * 添加设备配置
@@ -719,7 +722,7 @@ var DeviceManager = class extends EventEmitter2 {
   /**
    * 启动扫描 - 支持指定设备或所有设备
    */
-  async startScan(rssi = "-60", deviceId) {
+  async startScan(rssi = this.defaultRssi, deviceId) {
     if (deviceId) {
       const device = this.devices.get(deviceId);
       if (!device) {
@@ -1412,7 +1415,8 @@ var AppController = class extends EventEmitter4 {
     deviceConfigs.forEach((device) => {
       logger8.info("AppController", `  - ${device.deviceId}: ${device.serialPath}`);
     });
-    this.deviceManager = new DeviceManager(deviceConfigs);
+    const defaultRssi = configManager2.getConfig().rssi;
+    this.deviceManager = new DeviceManager(deviceConfigs, defaultRssi);
     logger8.info("AppController", "\u8BBE\u5907\u7BA1\u7406\u5668\u521D\u59CB\u5316\u5B8C\u6210");
   }
   /**
@@ -1458,7 +1462,6 @@ var AppController = class extends EventEmitter4 {
       this.messageHandler.handleError(error, cb);
     });
     this.deviceManager.on("device", (device) => {
-      logger8.info("AppController", "\u8BBE\u5907\u4E0A\u62A5:", device);
       const event = this.messageHandler.handleDeviceEvent(device);
       this.transport.send(event);
     });

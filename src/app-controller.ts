@@ -1,6 +1,7 @@
+import type { ConfigManager } from './config'
 import { EventEmitter } from 'events'
 import { getConfigManager } from './config'
-import { DeviceManager } from './device-manager'
+import { type DeviceConfig, DeviceManager } from './device-manager'
 import { HeartbeatManager } from './heartbeat-manager'
 import { getLogger, parseLogLevel } from './logger'
 import { MessageHandler } from './message-handler'
@@ -113,7 +114,7 @@ export class AppController extends EventEmitter {
   /**
    * 初始化日志管理器
    */
-  private initializeLogger(configManager: any) {
+  private initializeLogger(configManager: ConfigManager) {
     const loggingConfig = configManager.getLoggingConfig()
     getLogger({
       level: parseLogLevel(loggingConfig.level),
@@ -126,7 +127,7 @@ export class AppController extends EventEmitter {
   /**
    * 验证配置
    */
-  private validateConfiguration(configManager: any) {
+  private validateConfiguration(configManager: ConfigManager) {
     const validation = configManager.validate()
     if (!validation.valid) {
       logger.error('AppController', '配置验证失败:')
@@ -139,25 +140,27 @@ export class AppController extends EventEmitter {
   /**
    * 初始化设备管理器
    */
-  private async initializeDeviceManager(configManager: any) {
+  private async initializeDeviceManager(configManager: ConfigManager) {
     const deviceConfigs = configManager.getDeviceConfigs()
     if (deviceConfigs.length === 0) {
       throw new Error('没有启用的设备配置')
     }
 
     logger.info('AppController', `加载了 ${deviceConfigs.length} 个设备配置:`)
-    deviceConfigs.forEach((device: any) => {
+    deviceConfigs.forEach((device: DeviceConfig) => {
       logger.info('AppController', `  - ${device.deviceId}: ${device.serialPath}`)
     })
 
-    this.deviceManager = new DeviceManager(deviceConfigs)
+    const defaultRssi = configManager.getConfig().rssi
+
+    this.deviceManager = new DeviceManager(deviceConfigs, defaultRssi)
     logger.info('AppController', '设备管理器初始化完成')
   }
 
   /**
    * 初始化传输层
    */
-  private async initializeTransport(configManager: any) {
+  private async initializeTransport(configManager: ConfigManager) {
     const transportConfig = configManager.getTransportConfig()
     this.transport = new SerialTransport(transportConfig)
     logger.info('AppController', '传输层初始化完成')
@@ -206,7 +209,6 @@ export class AppController extends EventEmitter {
 
     // 监听设备管理器的设备事件，并通过传输层上报
     this.deviceManager.on('device', (device) => {
-      logger.info('AppController', '设备上报:', device)
       const event = this.messageHandler!.handleDeviceEvent(device as Record<string, unknown>)
       this.transport!.send(event)
     })

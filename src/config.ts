@@ -26,6 +26,7 @@ const SerialTransportConfigSchema = z.object({
 
 const AppConfigSchema = z.object({
   devices: z.array(DeviceConfigSchema),
+  rssi: z.string().optional().default('-50'),
   reportInterval: z.number().optional().default(5000),
   serialTransport: SerialTransportConfigSchema.optional().default({ serialPath: '/dev/ttyUSB0', baudRate: 115200, dataBits: 8, stopBits: 1, parity: 'none', timeout: 5000 }),
   logging: z.object({
@@ -47,6 +48,7 @@ const DEFAULT_CONFIG: AppConfig = {
       enabled: true,
     },
   ],
+  rssi: '-50',
   reportInterval: 5000,
   serialTransport: {
     serialPath: '/dev/ttyUSB1',

@@ -180,7 +180,6 @@ export class BlueDevice extends EventEmitter {
     // 如果未开启上报，则不处理
     if (!this.enableReport) return
 
-    logger.info('BlueDevice', `[${this.deviceId}] manufacturer`, manufacturer)
     this.emit('device', {
       mf: manufacturer,
     })
