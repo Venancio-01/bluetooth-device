@@ -122,6 +122,7 @@ export class BlueDevice extends EventEmitter {
   }
 
   async disconnect() {
+    this.stopReport()
     await this.stopScan()
     this.port?.close()
   }
@@ -261,8 +262,6 @@ export class BlueDevice extends EventEmitter {
 
       logger.info('BlueDevice', `[${this.deviceId}] 开始扫描，RSSI阈值: ${rssi}`)
       this.isScanning = true
-      // 启动定时清除已检测设备
-      this.startReportTimer()
 
       // 设置设备为观察者模式
       await this.sendAndSleep(buildObserverCommand(rssi))
@@ -300,6 +299,9 @@ export class BlueDevice extends EventEmitter {
 
   async startReport() {
     this.enableReport = true
+    // 启动定时清除已检测设备
+    this.startReportTimer()
+
     const manufacturer = [...new Set(this.detectionResultList.map(item => item.mf))].join(',')
     if (!manufacturer) return
     logger.info('BlueDevice', `[${this.deviceId}] 缓冲区检测结果:`, manufacturer)
@@ -310,6 +312,8 @@ export class BlueDevice extends EventEmitter {
   }
 
   async stopReport() {
+    // 停止定时清除已检测设备
+    this.stopReportTimer()
     this.enableReport = false
   }
 

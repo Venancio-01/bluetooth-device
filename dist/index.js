@@ -443,6 +443,7 @@ var BlueDevice = class extends EventEmitter {
     });
   }
   async disconnect() {
+    this.stopReport();
     await this.stopScan();
     this.port?.close();
   }
@@ -543,7 +544,6 @@ var BlueDevice = class extends EventEmitter {
       }
       logger2.info("BlueDevice", `[${this.deviceId}] \u5F00\u59CB\u626B\u63CF\uFF0CRSSI\u9608\u503C: ${rssi}`);
       this.isScanning = true;
-      this.startReportTimer();
       await this.sendAndSleep(buildObserverCommand(rssi));
       logger2.info("BlueDevice", `[${this.deviceId}] \u626B\u63CF\u5DF2\u542F\u52A8`);
     } catch (error) {
@@ -572,6 +572,7 @@ var BlueDevice = class extends EventEmitter {
   }
   async startReport() {
     this.enableReport = true;
+    this.startReportTimer();
     const manufacturer = [...new Set(this.detectionResultList.map((item) => item.mf))].join(",");
     if (!manufacturer) return;
     logger2.info("BlueDevice", `[${this.deviceId}] \u7F13\u51B2\u533A\u68C0\u6D4B\u7ED3\u679C:`, manufacturer);
@@ -580,6 +581,7 @@ var BlueDevice = class extends EventEmitter {
     });
   }
   async stopReport() {
+    this.stopReportTimer();
     this.enableReport = false;
   }
   addDetectionResult(result) {
