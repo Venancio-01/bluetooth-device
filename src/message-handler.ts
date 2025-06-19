@@ -1,5 +1,5 @@
 import type { DeviceManager } from './device-manager'
-import type { ResponseCallback } from './transport'
+import type { ResponseCallback } from './serial-transport'
 import {
   CommandCode,
   createDeviceEvent,

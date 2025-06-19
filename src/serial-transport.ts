@@ -1,6 +1,6 @@
 import type { Buffer } from 'buffer'
 import type { SerialTransportConfig } from './config'
-import type { ITransport, ResponseCallback } from './transport'
+import type { RequestPayload } from './communication'
 import { EventEmitter } from 'events'
 import { ReadlineParser } from '@serialport/parser-readline'
 import { SerialPort } from 'serialport'
@@ -9,11 +9,13 @@ import { getLogger } from './logger'
 
 const logger = getLogger()
 
+export type ResponseCallback = (response: string) => void
+
 /**
  * 串口传输层实现
  * 通过串口与上位机进行双向通信
  */
-export class SerialTransport extends EventEmitter implements ITransport {
+export class SerialTransport extends EventEmitter {
   private port: SerialPort | null = null
   private parser: ReadlineParser | null = null
   private readonly config: SerialTransportConfig
@@ -22,6 +24,13 @@ export class SerialTransport extends EventEmitter implements ITransport {
   private readonly reconnectInterval = 5000 // 重连间隔（毫秒）
   private readonly maxReconnectAttempts = 10
   private reconnectAttempts = 0
+
+  // 事件类型定义
+  on(event: 'data', listener: (data: RequestPayload, cb: ResponseCallback) => void): this
+  on(event: 'error', listener: (error: string, cb: ResponseCallback) => void): this
+  on(event: string, listener: (...args: any[]) => void): this {
+    return super.on(event, listener)
+  }
 
   constructor(config: SerialTransportConfig) {
     super()

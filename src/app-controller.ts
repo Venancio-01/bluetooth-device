@@ -1,11 +1,10 @@
-import type { ITransport } from './transport'
 import { EventEmitter } from 'events'
 import { getConfigManager } from './config'
 import { DeviceManager } from './device-manager'
 import { HeartbeatManager } from './heartbeat-manager'
 import { getLogger, parseLogLevel } from './logger'
 import { MessageHandler } from './message-handler'
-import { createTransport } from './transport-factory'
+import { SerialTransport } from './serial-transport'
 
 const logger = getLogger()
 
@@ -15,7 +14,7 @@ const logger = getLogger()
  */
 export class AppController extends EventEmitter {
   private deviceManager: DeviceManager | null = null
-  private transport: ITransport | null = null
+  private transport: SerialTransport | null = null
   private messageHandler: MessageHandler | null = null
   private heartbeatManager: HeartbeatManager | null = null
   private isInitialized = false
@@ -107,7 +106,7 @@ export class AppController extends EventEmitter {
   /**
    * 获取传输层
    */
-  getTransport(): ITransport | null {
+  getTransport(): SerialTransport | null {
     return this.transport
   }
 
@@ -160,7 +159,7 @@ export class AppController extends EventEmitter {
    */
   private async initializeTransport(configManager: any) {
     const transportConfig = configManager.getTransportConfig()
-    this.transport = createTransport(transportConfig)
+    this.transport = new SerialTransport(transportConfig)
     logger.info('AppController', '传输层初始化完成')
   }
 

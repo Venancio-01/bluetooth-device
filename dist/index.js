@@ -2,7 +2,7 @@
 import process2 from "process";
 
 // src/app-controller.ts
-import { EventEmitter as EventEmitter5 } from "events";
+import { EventEmitter as EventEmitter4 } from "events";
 
 // src/config.ts
 import fs from "fs";
@@ -126,12 +126,7 @@ var DeviceConfigSchema = z.object({
   baudRate: z.number().optional().default(115200),
   enabled: z.boolean().optional().default(true)
 });
-var HttpTransportConfigSchema = z.object({
-  type: z.literal("http"),
-  port: z.number().optional().default(8888)
-});
 var SerialTransportConfigSchema = z.object({
-  type: z.literal("serial"),
   serialPath: z.string(),
   baudRate: z.number().optional().default(115200),
   dataBits: z.number().optional().default(8),
@@ -142,10 +137,8 @@ var SerialTransportConfigSchema = z.object({
 });
 var AppConfigSchema = z.object({
   devices: z.array(DeviceConfigSchema),
-  enabledTransports: z.enum(["http", "serial"]).optional().default("http"),
   reportInterval: z.number().optional().default(5e3),
-  httpTransport: HttpTransportConfigSchema.optional().default({ type: "http", port: 8888 }),
-  serialTransport: SerialTransportConfigSchema.optional().default({ type: "serial", serialPath: "/dev/ttyUSB0", baudRate: 115200, dataBits: 8, stopBits: 1, parity: "none", timeout: 5e3 }),
+  serialTransport: SerialTransportConfigSchema.optional().default({ serialPath: "/dev/ttyUSB0", baudRate: 115200, dataBits: 8, stopBits: 1, parity: "none", timeout: 5e3 }),
   logging: z.object({
     level: z.enum(["debug", "info", "warn", "error"]).optional().default("info"),
     enableDevicePrefix: z.boolean().optional().default(true)
@@ -161,13 +154,7 @@ var DEFAULT_CONFIG = {
     }
   ],
   reportInterval: 5e3,
-  enabledTransports: "http",
-  httpTransport: {
-    type: "http",
-    port: 8888
-  },
   serialTransport: {
-    type: "serial",
     serialPath: "/dev/ttyUSB1",
     baudRate: 115200,
     dataBits: 8,
@@ -247,7 +234,7 @@ var ConfigManager = class {
    * 获取传输层配置
    */
   getTransportConfig() {
-    return this.config.enabledTransports === "http" ? this.config.httpTransport : this.config.serialTransport;
+    return this.config.serialTransport;
   }
   /**
    * 获取日志配置
@@ -1071,111 +1058,12 @@ var MessageHandler = class {
   }
 };
 
-// src/http-transport.ts
-import { EventEmitter as EventEmitter3 } from "events";
-import express from "express";
-var logger7 = getLogger();
-var HttpTransport = class extends EventEmitter3 {
-  server = null;
-  sseClients = [];
-  port;
-  app;
-  constructor(port = 8888) {
-    super();
-    this.port = port;
-    this.app = express();
-    this.setupRoutes();
-  }
-  start = async () => {
-    return new Promise((resolve) => {
-      this.server = this.app.listen(this.port, () => {
-        logger7.info("HttpTransport", `HTTP server listening on http://0.0.0.0:${this.port}`);
-        resolve();
-      });
-    });
-  };
-  stop = async () => {
-    return new Promise((resolve) => {
-      this.sseClients.forEach((res) => res.end());
-      this.sseClients = [];
-      if (this.server) {
-        this.server.close(() => {
-          logger7.info("HttpTransport", "HTTP server stopped");
-          resolve();
-        });
-      } else {
-        resolve();
-      }
-    });
-  };
-  send = (data) => {
-    logger7.info("HttpTransport", `Sending event to ${this.sseClients.length} clients`);
-    this.sseClients.forEach((res) => {
-      res.write(`data: ${data}
-
-`);
-    });
-  };
-  setupRoutes = () => {
-    this.app.post("/command", express.json(), (req, res) => {
-      try {
-        const cb = (response) => {
-          res.status(200).send(response);
-        };
-        const requestPayload = parseJSONMessage(JSON.stringify(req.body));
-        if (!requestPayload) {
-          this.emit("error", "\u8BF7\u6C42\u6570\u636E\u683C\u5F0F\u4E0D\u6B63\u786E");
-          res.status(400).json({
-            t: 2,
-            // ERROR
-            d: {
-              code: "E400",
-              msg: "Invalid request format",
-              suggestion: "Please check the request format and try again"
-            }
-          });
-          return;
-        }
-        this.emit("data", requestPayload, cb);
-      } catch (error) {
-        const errorMessage = `HTTP\u4F20\u8F93\u5C42\u5904\u7406\u8BF7\u6C42\u5F02\u5E38: ${error.message}`;
-        this.emit("error", errorMessage);
-        res.status(500).json({
-          t: 2,
-          // ERROR
-          d: {
-            code: "E999",
-            msg: "Internal Server Error",
-            suggestion: "Please check the request format and try again",
-            context: { error: error.message }
-          }
-        });
-      }
-    });
-    this.app.get("/events", this.setupSse);
-  };
-  setupSse = (req, res) => {
-    res.writeHead(200, {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-      "Connection": "keep-alive"
-    });
-    res.write("\n");
-    this.sseClients.push(res);
-    logger7.info("HttpTransport", "SSE client connected");
-    res.on("close", () => {
-      this.sseClients = this.sseClients.filter((client) => client !== res);
-      logger7.info("HttpTransport", "SSE client disconnected");
-    });
-  };
-};
-
 // src/serial-transport.ts
-import { EventEmitter as EventEmitter4 } from "events";
+import { EventEmitter as EventEmitter3 } from "events";
 import { ReadlineParser as ReadlineParser2 } from "@serialport/parser-readline";
 import { SerialPort as SerialPort2 } from "serialport";
-var logger8 = getLogger();
-var SerialTransport = class extends EventEmitter4 {
+var logger7 = getLogger();
+var SerialTransport = class extends EventEmitter3 {
   port = null;
   parser = null;
   config;
@@ -1185,6 +1073,9 @@ var SerialTransport = class extends EventEmitter4 {
   // 重连间隔（毫秒）
   maxReconnectAttempts = 10;
   reconnectAttempts = 0;
+  on(event, listener) {
+    return super.on(event, listener);
+  }
   constructor(config) {
     super();
     this.config = config;
@@ -1193,14 +1084,14 @@ var SerialTransport = class extends EventEmitter4 {
    * 启动串口传输层
    */
   start = async () => {
-    logger8.info("SerialTransport", `\u542F\u52A8\u4E32\u53E3\u4F20\u8F93\u5C42: ${this.config.serialPath}`);
+    logger7.info("SerialTransport", `\u542F\u52A8\u4E32\u53E3\u4F20\u8F93\u5C42: ${this.config.serialPath}`);
     await this.connect();
   };
   /**
    * 停止串口传输层
    */
   stop = async () => {
-    logger8.info("SerialTransport", "\u505C\u6B62\u4E32\u53E3\u4F20\u8F93\u5C42");
+    logger7.info("SerialTransport", "\u505C\u6B62\u4E32\u53E3\u4F20\u8F93\u5C42");
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
@@ -1212,7 +1103,7 @@ var SerialTransport = class extends EventEmitter4 {
    */
   send = (data) => {
     if (!this.isConnected || !this.port) {
-      logger8.warn("SerialTransport", "\u4E32\u53E3\u672A\u8FDE\u63A5\uFF0C\u65E0\u6CD5\u53D1\u9001\u6570\u636E");
+      logger7.warn("SerialTransport", "\u4E32\u53E3\u672A\u8FDE\u63A5\uFF0C\u65E0\u6CD5\u53D1\u9001\u6570\u636E");
       return;
     }
     try {
@@ -1220,14 +1111,14 @@ var SerialTransport = class extends EventEmitter4 {
 `;
       this.port.write(dataWithNewline, (err) => {
         if (err) {
-          logger8.error("SerialTransport", "\u53D1\u9001\u6570\u636E\u5931\u8D25:", err);
+          logger7.error("SerialTransport", "\u53D1\u9001\u6570\u636E\u5931\u8D25:", err);
           this.emit("error", `\u53D1\u9001\u6570\u636E\u5931\u8D25: ${err.message}`);
         } else {
-          logger8.debug("SerialTransport", "\u53D1\u9001\u6570\u636E:", data);
+          logger7.debug("SerialTransport", "\u53D1\u9001\u6570\u636E:", data);
         }
       });
     } catch (error) {
-      logger8.error("SerialTransport", "\u53D1\u9001\u6570\u636E\u5F02\u5E38:", error);
+      logger7.error("SerialTransport", "\u53D1\u9001\u6570\u636E\u5F02\u5E38:", error);
       this.emit("error", `\u53D1\u9001\u6570\u636E\u5F02\u5E38: ${error instanceof Error ? error.message : String(error)}`);
     }
   };
@@ -1249,35 +1140,35 @@ var SerialTransport = class extends EventEmitter4 {
         this.port.on("open", () => {
           this.isConnected = true;
           this.reconnectAttempts = 0;
-          logger8.info("SerialTransport", `\u4E32\u53E3\u8FDE\u63A5\u6210\u529F: ${this.config.serialPath}`);
+          logger7.info("SerialTransport", `\u4E32\u53E3\u8FDE\u63A5\u6210\u529F: ${this.config.serialPath}`);
           resolve();
         });
         this.port.on("error", (err) => {
-          logger8.error("SerialTransport", "\u4E32\u53E3\u9519\u8BEF:", err);
+          logger7.error("SerialTransport", "\u4E32\u53E3\u9519\u8BEF:", err);
           this.isConnected = false;
           this.emit("error", `\u4E32\u53E3\u9519\u8BEF: ${err.message}`);
           reject(err);
         });
         this.port.on("close", () => {
-          logger8.warn("SerialTransport", "\u4E32\u53E3\u8FDE\u63A5\u5173\u95ED");
+          logger7.warn("SerialTransport", "\u4E32\u53E3\u8FDE\u63A5\u5173\u95ED");
           this.isConnected = false;
           this.scheduleReconnect();
         });
         this.port.on("data", (data) => {
-          logger8.debug("SerialTransport", "\u63A5\u6536\u539F\u59CB\u6570\u636E:", data.toString("utf8"));
+          logger7.debug("SerialTransport", "\u63A5\u6536\u539F\u59CB\u6570\u636E:", data.toString("utf8"));
         });
         this.parser.on("data", (data) => {
-          logger8.debug("SerialTransport", "\u63A5\u6536\u89E3\u6790\u5206\u9694\u7B26\u540E\u7684\u6570\u636E:", data);
+          logger7.debug("SerialTransport", "\u63A5\u6536\u89E3\u6790\u5206\u9694\u7B26\u540E\u7684\u6570\u636E:", data);
           try {
             this.handleReceivedData(data);
           } catch (error) {
-            logger8.error("SerialTransport", "\u5904\u7406\u63A5\u6536\u6570\u636E\u5931\u8D25:", error);
+            logger7.error("SerialTransport", "\u5904\u7406\u63A5\u6536\u6570\u636E\u5931\u8D25:", error);
             this.emit("error", `\u5904\u7406\u63A5\u6536\u6570\u636E\u5931\u8D25: ${error instanceof Error ? error.message : String(error)}`);
           }
         });
         this.port.open();
       } catch (error) {
-        logger8.error("SerialTransport", "\u521B\u5EFA\u4E32\u53E3\u8FDE\u63A5\u5931\u8D25:", error);
+        logger7.error("SerialTransport", "\u521B\u5EFA\u4E32\u53E3\u8FDE\u63A5\u5931\u8D25:", error);
         reject(error);
       }
     });
@@ -1290,7 +1181,7 @@ var SerialTransport = class extends EventEmitter4 {
       if (this.port && this.isConnected) {
         this.port.close(() => {
           this.isConnected = false;
-          logger8.info("SerialTransport", "\u4E32\u53E3\u8FDE\u63A5\u5DF2\u65AD\u5F00");
+          logger7.info("SerialTransport", "\u4E32\u53E3\u8FDE\u63A5\u5DF2\u65AD\u5F00");
           resolve();
         });
       } else {
@@ -1308,13 +1199,13 @@ var SerialTransport = class extends EventEmitter4 {
     try {
       const requestPayload = parseJSONMessage(data);
       if (!requestPayload) {
-        logger8.warn("SerialTransport", "\u63A5\u6536\u5230\u7684\u6570\u636E\u683C\u5F0F\u4E0D\u6B63\u786E:", data);
+        logger7.warn("SerialTransport", "\u63A5\u6536\u5230\u7684\u6570\u636E\u683C\u5F0F\u4E0D\u6B63\u786E:", data);
         this.emit("error", `\u63A5\u6536\u5230\u7684\u6570\u636E\u683C\u5F0F\u4E0D\u6B63\u786E: ${data}`, responseCallback);
         return;
       }
       this.emit("data", requestPayload, responseCallback);
     } catch (error) {
-      logger8.error("SerialTransport", "\u5904\u7406\u63A5\u6536\u6570\u636E\u5931\u8D25:", error);
+      logger7.error("SerialTransport", "\u5904\u7406\u63A5\u6536\u6570\u636E\u5931\u8D25:", error);
       this.emit("error", `\u5904\u7406\u63A5\u6536\u6570\u636E\u5931\u8D25: ${error instanceof Error ? error.message : String(error)}`, responseCallback);
     }
   }
@@ -1323,21 +1214,21 @@ var SerialTransport = class extends EventEmitter4 {
    */
   scheduleReconnect() {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      logger8.error("SerialTransport", `\u91CD\u8FDE\u5931\u8D25\uFF0C\u5DF2\u8FBE\u5230\u6700\u5927\u91CD\u8FDE\u6B21\u6570: ${this.maxReconnectAttempts}`);
+      logger7.error("SerialTransport", `\u91CD\u8FDE\u5931\u8D25\uFF0C\u5DF2\u8FBE\u5230\u6700\u5927\u91CD\u8FDE\u6B21\u6570: ${this.maxReconnectAttempts}`);
       return;
     }
     if (this.reconnectTimer) {
       return;
     }
     this.reconnectAttempts++;
-    logger8.info("SerialTransport", `${this.reconnectInterval / 1e3}\u79D2\u540E\u5C1D\u8BD5\u91CD\u8FDE (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
+    logger7.info("SerialTransport", `${this.reconnectInterval / 1e3}\u79D2\u540E\u5C1D\u8BD5\u91CD\u8FDE (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
     this.reconnectTimer = setTimeout(async () => {
       this.reconnectTimer = null;
       try {
         await this.connect();
-        logger8.info("SerialTransport", "\u91CD\u8FDE\u6210\u529F");
+        logger7.info("SerialTransport", "\u91CD\u8FDE\u6210\u529F");
       } catch (error) {
-        logger8.error("SerialTransport", "\u91CD\u8FDE\u5931\u8D25:", error);
+        logger7.error("SerialTransport", "\u91CD\u8FDE\u5931\u8D25:", error);
         this.scheduleReconnect();
       }
     }, this.reconnectInterval);
@@ -1356,31 +1247,9 @@ var SerialTransport = class extends EventEmitter4 {
   }
 };
 
-// src/transport-factory.ts
-var logger9 = getLogger();
-function createTransport(config) {
-  logger9.info("TransportFactory", "\u6B63\u5728\u521B\u5EFA\u4F20\u8F93\u5C42:", config.type);
-  switch (config.type) {
-    case "http":
-      return createHttpTransport(config);
-    case "serial":
-      return createSerialTransport(config);
-    default:
-      throw new Error(`\u4E0D\u652F\u6301\u7684\u4F20\u8F93\u5C42\u7C7B\u578B: ${config.type}`);
-  }
-}
-function createHttpTransport(config) {
-  logger9.info("TransportFactory", `\u521B\u5EFA HTTP \u4F20\u8F93\u5C42\uFF0C\u7AEF\u53E3: ${config.port}`);
-  return new HttpTransport(config.port);
-}
-function createSerialTransport(config) {
-  logger9.info("TransportFactory", `\u521B\u5EFA\u4E32\u53E3\u4F20\u8F93\u5C42\uFF0C\u7AEF\u53E3: ${config.serialPath}`);
-  return new SerialTransport(config);
-}
-
 // src/app-controller.ts
-var logger10 = getLogger();
-var AppController = class extends EventEmitter5 {
+var logger8 = getLogger();
+var AppController = class extends EventEmitter4 {
   deviceManager = null;
   transport = null;
   messageHandler = null;
@@ -1391,7 +1260,7 @@ var AppController = class extends EventEmitter5 {
    */
   async initialize() {
     if (this.isInitialized) {
-      logger10.warn("AppController", "\u5E94\u7528\u7A0B\u5E8F\u5DF2\u7ECF\u521D\u59CB\u5316");
+      logger8.warn("AppController", "\u5E94\u7528\u7A0B\u5E8F\u5DF2\u7ECF\u521D\u59CB\u5316");
       return;
     }
     try {
@@ -1407,9 +1276,9 @@ var AppController = class extends EventEmitter5 {
       await this.initializeDevices();
       this.startHeartbeat();
       this.isInitialized = true;
-      logger10.info("AppController", "\u5E94\u7528\u7A0B\u5E8F\u521D\u59CB\u5316\u5B8C\u6210");
+      logger8.info("AppController", "\u5E94\u7528\u7A0B\u5E8F\u521D\u59CB\u5316\u5B8C\u6210");
     } catch (error) {
-      logger10.error("AppController", "\u5E94\u7528\u7A0B\u5E8F\u521D\u59CB\u5316\u5931\u8D25:", error);
+      logger8.error("AppController", "\u5E94\u7528\u7A0B\u5E8F\u521D\u59CB\u5316\u5931\u8D25:", error);
       throw error;
     }
   }
@@ -1417,15 +1286,15 @@ var AppController = class extends EventEmitter5 {
    * 关闭应用程序
    */
   async shutdown() {
-    logger10.info("AppController", "\u6B63\u5728\u5173\u95ED\u5E94\u7528\u7A0B\u5E8F...");
+    logger8.info("AppController", "\u6B63\u5728\u5173\u95ED\u5E94\u7528\u7A0B\u5E8F...");
     try {
       this.heartbeatManager?.stop();
       await this.deviceManager?.disconnectAll();
       await this.transport?.stop();
       this.isInitialized = false;
-      logger10.info("AppController", "\u5E94\u7528\u7A0B\u5E8F\u5DF2\u5B89\u5168\u5173\u95ED");
+      logger8.info("AppController", "\u5E94\u7528\u7A0B\u5E8F\u5DF2\u5B89\u5168\u5173\u95ED");
     } catch (error) {
-      logger10.error("AppController", "\u5173\u95ED\u5E94\u7528\u7A0B\u5E8F\u65F6\u53D1\u751F\u9519\u8BEF:", error);
+      logger8.error("AppController", "\u5173\u95ED\u5E94\u7528\u7A0B\u5E8F\u65F6\u53D1\u751F\u9519\u8BEF:", error);
       throw error;
     }
   }
@@ -1451,7 +1320,7 @@ var AppController = class extends EventEmitter5 {
       enableDevicePrefix: loggingConfig.enableDevicePrefix,
       enableTimestamp: true
     });
-    logger10.info("AppController", "\u65E5\u5FD7\u7BA1\u7406\u5668\u521D\u59CB\u5316\u5B8C\u6210");
+    logger8.info("AppController", "\u65E5\u5FD7\u7BA1\u7406\u5668\u521D\u59CB\u5316\u5B8C\u6210");
   }
   /**
    * 验证配置
@@ -1459,11 +1328,11 @@ var AppController = class extends EventEmitter5 {
   validateConfiguration(configManager2) {
     const validation = configManager2.validate();
     if (!validation.valid) {
-      logger10.error("AppController", "\u914D\u7F6E\u9A8C\u8BC1\u5931\u8D25:");
-      validation.errors.forEach((error) => logger10.error("AppController", `  - ${error}`));
+      logger8.error("AppController", "\u914D\u7F6E\u9A8C\u8BC1\u5931\u8D25:");
+      validation.errors.forEach((error) => logger8.error("AppController", `  - ${error}`));
       throw new Error("\u914D\u7F6E\u9A8C\u8BC1\u5931\u8D25");
     }
-    logger10.info("AppController", "\u914D\u7F6E\u9A8C\u8BC1\u901A\u8FC7");
+    logger8.info("AppController", "\u914D\u7F6E\u9A8C\u8BC1\u901A\u8FC7");
   }
   /**
    * 初始化设备管理器
@@ -1473,20 +1342,20 @@ var AppController = class extends EventEmitter5 {
     if (deviceConfigs.length === 0) {
       throw new Error("\u6CA1\u6709\u542F\u7528\u7684\u8BBE\u5907\u914D\u7F6E");
     }
-    logger10.info("AppController", `\u52A0\u8F7D\u4E86 ${deviceConfigs.length} \u4E2A\u8BBE\u5907\u914D\u7F6E:`);
+    logger8.info("AppController", `\u52A0\u8F7D\u4E86 ${deviceConfigs.length} \u4E2A\u8BBE\u5907\u914D\u7F6E:`);
     deviceConfigs.forEach((device) => {
-      logger10.info("AppController", `  - ${device.deviceId}: ${device.serialPath}`);
+      logger8.info("AppController", `  - ${device.deviceId}: ${device.serialPath}`);
     });
     this.deviceManager = new DeviceManager(deviceConfigs);
-    logger10.info("AppController", "\u8BBE\u5907\u7BA1\u7406\u5668\u521D\u59CB\u5316\u5B8C\u6210");
+    logger8.info("AppController", "\u8BBE\u5907\u7BA1\u7406\u5668\u521D\u59CB\u5316\u5B8C\u6210");
   }
   /**
    * 初始化传输层
    */
   async initializeTransport(configManager2) {
     const transportConfig = configManager2.getTransportConfig();
-    this.transport = createTransport(transportConfig);
-    logger10.info("AppController", "\u4F20\u8F93\u5C42\u521D\u59CB\u5316\u5B8C\u6210");
+    this.transport = new SerialTransport(transportConfig);
+    logger8.info("AppController", "\u4F20\u8F93\u5C42\u521D\u59CB\u5316\u5B8C\u6210");
   }
   /**
    * 初始化消息处理器
@@ -1496,7 +1365,7 @@ var AppController = class extends EventEmitter5 {
       throw new Error("\u8BBE\u5907\u7BA1\u7406\u5668\u672A\u521D\u59CB\u5316");
     }
     this.messageHandler = new MessageHandler(this.deviceManager);
-    logger10.info("AppController", "\u6D88\u606F\u5904\u7406\u5668\u521D\u59CB\u5316\u5B8C\u6210");
+    logger8.info("AppController", "\u6D88\u606F\u5904\u7406\u5668\u521D\u59CB\u5316\u5B8C\u6210");
   }
   /**
    * 初始化心跳管理器
@@ -1506,7 +1375,7 @@ var AppController = class extends EventEmitter5 {
       throw new Error("\u4F20\u8F93\u5C42\u6216\u8BBE\u5907\u7BA1\u7406\u5668\u672A\u521D\u59CB\u5316");
     }
     this.heartbeatManager = new HeartbeatManager(this.transport, this.deviceManager);
-    logger10.info("AppController", "\u5FC3\u8DF3\u7BA1\u7406\u5668\u521D\u59CB\u5316\u5B8C\u6210");
+    logger8.info("AppController", "\u5FC3\u8DF3\u7BA1\u7406\u5668\u521D\u59CB\u5316\u5B8C\u6210");
   }
   /**
    * 设置事件监听器
@@ -1519,24 +1388,24 @@ var AppController = class extends EventEmitter5 {
       this.messageHandler.handleMessage(message, cb);
     });
     this.transport.on("error", (error, cb) => {
-      logger10.error("AppController", "\u4F20\u8F93\u5C42\u9519\u8BEF:", error);
+      logger8.error("AppController", "\u4F20\u8F93\u5C42\u9519\u8BEF:", error);
       this.messageHandler.handleError(error, cb);
     });
     this.deviceManager.on("device", (device) => {
-      logger10.info("AppController", "\u8BBE\u5907\u4E0A\u62A5:", device);
+      logger8.info("AppController", "\u8BBE\u5907\u4E0A\u62A5:", device);
       const event = this.messageHandler.handleDeviceEvent(device);
       this.transport.send(event);
     });
     this.deviceManager.on("deviceConnected", (info) => {
-      logger10.info("AppController", `\u8BBE\u5907 ${info.deviceId} (${info.serialPath}) \u8FDE\u63A5\u6210\u529F`);
+      logger8.info("AppController", `\u8BBE\u5907 ${info.deviceId} (${info.serialPath}) \u8FDE\u63A5\u6210\u529F`);
     });
     this.deviceManager.on("deviceDisconnected", (info) => {
-      logger10.warn("AppController", `\u8BBE\u5907 ${info.deviceId} (${info.serialPath}) \u65AD\u5F00\u8FDE\u63A5`);
+      logger8.warn("AppController", `\u8BBE\u5907 ${info.deviceId} (${info.serialPath}) \u65AD\u5F00\u8FDE\u63A5`);
     });
     this.deviceManager.on("deviceError", (error) => {
-      logger10.error("AppController", `\u8BBE\u5907 ${error.deviceId} (${error.serialPath}) \u53D1\u751F\u9519\u8BEF:`, error.error);
+      logger8.error("AppController", `\u8BBE\u5907 ${error.deviceId} (${error.serialPath}) \u53D1\u751F\u9519\u8BEF:`, error.error);
     });
-    logger10.info("AppController", "\u4E8B\u4EF6\u76D1\u542C\u5668\u8BBE\u7F6E\u5B8C\u6210");
+    logger8.info("AppController", "\u4E8B\u4EF6\u76D1\u542C\u5668\u8BBE\u7F6E\u5B8C\u6210");
   }
   /**
    * 启动传输层
@@ -1546,7 +1415,7 @@ var AppController = class extends EventEmitter5 {
       throw new Error("\u4F20\u8F93\u5C42\u672A\u521D\u59CB\u5316");
     }
     await this.transport.start();
-    logger10.info("AppController", "\u4F20\u8F93\u5C42\u542F\u52A8\u6210\u529F");
+    logger8.info("AppController", "\u4F20\u8F93\u5C42\u542F\u52A8\u6210\u529F");
   }
   /**
    * 初始化设备
@@ -1557,9 +1426,9 @@ var AppController = class extends EventEmitter5 {
     }
     await this.deviceManager.initializeDevices();
     const stats = this.deviceManager.getConnectionStats();
-    logger10.info("AppController", `\u8BBE\u5907\u521D\u59CB\u5316\u5B8C\u6210: ${stats.connected}/${stats.total} \u4E2A\u8BBE\u5907\u8FDE\u63A5\u6210\u529F`);
+    logger8.info("AppController", `\u8BBE\u5907\u521D\u59CB\u5316\u5B8C\u6210: ${stats.connected}/${stats.total} \u4E2A\u8BBE\u5907\u8FDE\u63A5\u6210\u529F`);
     if (stats.reconnecting > 0) {
-      logger10.info("AppController", `${stats.reconnecting} \u4E2A\u8BBE\u5907\u6B63\u5728\u91CD\u8FDE\u4E2D`);
+      logger8.info("AppController", `${stats.reconnecting} \u4E2A\u8BBE\u5907\u6B63\u5728\u91CD\u8FDE\u4E2D`);
     }
     if (stats.connected === 0 && stats.reconnecting === 0) {
       throw new Error("\u6CA1\u6709\u8BBE\u5907\u8FDE\u63A5\u6210\u529F");
@@ -1573,33 +1442,33 @@ var AppController = class extends EventEmitter5 {
       throw new Error("\u5FC3\u8DF3\u7BA1\u7406\u5668\u672A\u521D\u59CB\u5316");
     }
     this.heartbeatManager.start();
-    logger10.info("AppController", "\u5FC3\u8DF3\u5B9A\u65F6\u5668\u5DF2\u542F\u52A8");
+    logger8.info("AppController", "\u5FC3\u8DF3\u5B9A\u65F6\u5668\u5DF2\u542F\u52A8");
   }
 };
 
 // src/index.ts
-var logger11 = getLogger();
+var logger9 = getLogger();
 var appController = null;
 async function main() {
   try {
-    logger11.info("Main", "\u6B63\u5728\u542F\u52A8\u84DD\u7259\u8BBE\u5907\u68C0\u6D4B\u7CFB\u7EDF...");
+    logger9.info("Main", "\u6B63\u5728\u542F\u52A8\u84DD\u7259\u8BBE\u5907\u68C0\u6D4B\u7CFB\u7EDF...");
     appController = new AppController();
     await appController.initialize();
-    logger11.info("Main", "\u84DD\u7259\u8BBE\u5907\u68C0\u6D4B\u7CFB\u7EDF\u542F\u52A8\u6210\u529F");
+    logger9.info("Main", "\u84DD\u7259\u8BBE\u5907\u68C0\u6D4B\u7CFB\u7EDF\u542F\u52A8\u6210\u529F");
   } catch (error) {
-    logger11.error("Main", "\u542F\u52A8\u5931\u8D25:", error);
+    logger9.error("Main", "\u542F\u52A8\u5931\u8D25:", error);
     process2.exit(1);
   }
 }
 process2.on("SIGINT", async () => {
-  logger11.info("Main", "\n\u6B63\u5728\u5173\u95ED\u7A0B\u5E8F...");
+  logger9.info("Main", "\n\u6B63\u5728\u5173\u95ED\u7A0B\u5E8F...");
   try {
     if (appController) {
       await appController.shutdown();
     }
-    logger11.info("Main", "\u7A0B\u5E8F\u5DF2\u5B89\u5168\u5173\u95ED");
+    logger9.info("Main", "\u7A0B\u5E8F\u5DF2\u5B89\u5168\u5173\u95ED");
   } catch (error) {
-    logger11.error("Main", "\u5173\u95ED\u7A0B\u5E8F\u65F6\u53D1\u751F\u9519\u8BEF:", error);
+    logger9.error("Main", "\u5173\u95ED\u7A0B\u5E8F\u65F6\u53D1\u751F\u9519\u8BEF:", error);
   }
   process2.exit();
 });

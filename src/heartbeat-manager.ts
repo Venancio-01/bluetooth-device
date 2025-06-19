@@ -1,5 +1,5 @@
 import type { DeviceManager } from './device-manager'
-import type { ITransport } from './transport'
+import type { SerialTransport } from './serial-transport'
 import { createHeartbeatEvent } from './communication'
 import { getLogger } from './logger'
 
@@ -10,12 +10,12 @@ const logger = getLogger()
  * 负责心跳定时器的管理和心跳事件发送
  */
 export class HeartbeatManager {
-  private transport: ITransport
+  private transport: SerialTransport
   private deviceManager: DeviceManager
   private heartbeatTimer: NodeJS.Timeout | null = null
   private readonly heartbeatInterval: number = 2000 // 2秒
 
-  constructor(transport: ITransport, deviceManager: DeviceManager) {
+  constructor(transport: SerialTransport, deviceManager: DeviceManager) {
     this.transport = transport
     this.deviceManager = deviceManager
   }
