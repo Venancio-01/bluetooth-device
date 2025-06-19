@@ -17,6 +17,7 @@
   "dependencies": {
     "@serialport/parser-readline": "^13.0.0",
     "axios": "^1.10.0",
+    "dayjs": "^1.11.13",
     "eventsource": "^4.0.0",
     "express": "^5.1.0",
     "serialport": "^13.0.0",

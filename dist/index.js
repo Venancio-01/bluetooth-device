@@ -511,8 +511,9 @@ var BlueDevice = class extends EventEmitter {
       await this.sendAndSleep(buildEnterCommandMode(), 500);
       await this.sendAndSleep(buildSetRoleCommand(), 500);
       await this.sendAndSleep(buildRestartCommand(), 2e3);
-      await this.sendAndSleep(buildEnterCommandMode(), 500);
+      await this.sendAndSleep(buildEnterCommandMode(), 1e3);
       this.initializeState = "initialized";
+      await this.startScan();
       logger2.info("BlueDevice", `[${this.deviceId}] \u8BBE\u5907\u521D\u59CB\u5316\u5B8C\u6210`);
     } catch (error) {
       this.initializeState = "uninitialized";
@@ -1153,9 +1154,6 @@ var SerialTransport = class extends EventEmitter3 {
           logger7.warn("SerialTransport", "\u4E32\u53E3\u8FDE\u63A5\u5173\u95ED");
           this.isConnected = false;
           this.scheduleReconnect();
-        });
-        this.port.on("data", (data) => {
-          logger7.debug("SerialTransport", "\u63A5\u6536\u539F\u59CB\u6570\u636E:", data.toString("utf8"));
         });
         this.parser.on("data", (data) => {
           logger7.debug("SerialTransport", "\u63A5\u6536\u89E3\u6790\u5206\u9694\u7B26\u540E\u7684\u6570\u636E:", data);

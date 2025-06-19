@@ -1,6 +1,6 @@
 import type { Buffer } from 'buffer'
-import type { SerialTransportConfig } from './config'
 import type { RequestPayload } from './communication'
+import type { SerialTransportConfig } from './config'
 import { EventEmitter } from 'events'
 import { ReadlineParser } from '@serialport/parser-readline'
 import { SerialPort } from 'serialport'
@@ -26,9 +26,9 @@ export class SerialTransport extends EventEmitter {
   private reconnectAttempts = 0
 
   // 事件类型定义
-  on(event: 'data', listener: (data: RequestPayload, cb: ResponseCallback) => void): this
-  on(event: 'error', listener: (error: string, cb: ResponseCallback) => void): this
-  on(event: string, listener: (...args: any[]) => void): this {
+  override on(event: 'data', listener: (data: RequestPayload, cb: ResponseCallback) => void): this
+  override on(event: 'error', listener: (error: string, cb: ResponseCallback) => void): this
+  override on(event: string, listener: (...args: any[]) => void): this {
     return super.on(event, listener)
   }
 
@@ -127,10 +127,6 @@ export class SerialTransport extends EventEmitter {
           logger.warn('SerialTransport', '串口连接关闭')
           this.isConnected = false
           this.scheduleReconnect()
-        })
-
-        this.port.on('data', (data: Buffer) => {
-          logger.debug('SerialTransport', '接收原始数据:', data.toString('utf8'))
         })
 
         // 监听数据接收事件

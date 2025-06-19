@@ -209,9 +209,13 @@ export class BlueDevice extends EventEmitter {
       await this.sendAndSleep(buildRestartCommand(), 2000)
 
       // 进入AT命令模式
-      await this.sendAndSleep(buildEnterCommandMode(), 500)
+      await this.sendAndSleep(buildEnterCommandMode(), 1000)
 
       this.initializeState = 'initialized'
+
+      // 开始扫描
+      await this.startScan()
+
       logger.info('BlueDevice', `[${this.deviceId}] 设备初始化完成`)
     }
     catch (error) {
