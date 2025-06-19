@@ -1,4 +1,3 @@
-import type { DeviceConfig } from './device-manager'
 import fs from 'fs'
 import path from 'path'
 import process from 'process'
@@ -138,13 +137,9 @@ export class ConfigManager {
   /**
    * 获取设备配置列表
    */
-  getDeviceConfigs(): DeviceConfig[] {
+  getDeviceConfigs(): DeviceConfigWithOptions[] {
     return this.config.devices
       .filter(device => device.enabled)
-      .map(device => ({
-        serialPath: device.serialPath,
-        deviceId: device.deviceId || '',
-      }))
   }
 
   /**

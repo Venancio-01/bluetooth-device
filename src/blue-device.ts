@@ -210,7 +210,7 @@ export class BlueDevice extends EventEmitter {
       return
     }
 
-    logger.info('BlueDevice', `[${this.deviceId}] 开始初始化设备`)
+    logger.info('BlueDevice', `[${this.deviceId}] 开始初始化设备...`)
     this.initializeState = 'initializing'
 
     try {

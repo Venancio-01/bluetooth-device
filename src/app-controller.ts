@@ -1,7 +1,7 @@
 import type { ConfigManager } from './config'
 import { EventEmitter } from 'events'
 import { getConfigManager } from './config'
-import { type DeviceConfig, DeviceManager } from './device-manager'
+import { DeviceManager } from './device-manager'
 import { HeartbeatManager } from './heartbeat-manager'
 import { getLogger, parseLogLevel } from './logger'
 import { MessageHandler } from './message-handler'
@@ -141,19 +141,18 @@ export class AppController extends EventEmitter {
    * 初始化设备管理器
    */
   private async initializeDeviceManager(configManager: ConfigManager) {
-    const deviceConfigs = configManager.getDeviceConfigs()
+    const config = configManager.getConfig()
+    const deviceConfigs = config.devices
     if (deviceConfigs.length === 0) {
       throw new Error('没有启用的设备配置')
     }
 
     logger.info('AppController', `加载了 ${deviceConfigs.length} 个设备配置:`)
-    deviceConfigs.forEach((device: DeviceConfig) => {
+    deviceConfigs.forEach((device) => {
       logger.info('AppController', `  - ${device.deviceId}: ${device.serialPath}`)
     })
 
-    const defaultRssi = configManager.getConfig().rssi
-
-    this.deviceManager = new DeviceManager(deviceConfigs, defaultRssi)
+    this.deviceManager = new DeviceManager(config)
     logger.info('AppController', '设备管理器初始化完成')
   }
 

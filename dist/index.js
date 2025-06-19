@@ -227,10 +227,7 @@ var ConfigManager = class {
    * 获取设备配置列表
    */
   getDeviceConfigs() {
-    return this.config.devices.filter((device) => device.enabled).map((device) => ({
-      serialPath: device.serialPath,
-      deviceId: device.deviceId || ""
-    }));
+    return this.config.devices.filter((device) => device.enabled);
   }
   /**
    * 获取传输层配置
@@ -511,7 +508,7 @@ var BlueDevice = class extends EventEmitter {
     if (this.initializeState === "initializing" || this.initializeState === "initialized") {
       return;
     }
-    logger2.info("BlueDevice", `[${this.deviceId}] \u5F00\u59CB\u521D\u59CB\u5316\u8BBE\u5907`);
+    logger2.info("BlueDevice", `[${this.deviceId}] \u5F00\u59CB\u521D\u59CB\u5316\u8BBE\u5907...`);
     this.initializeState = "initializing";
     try {
       await this.sendAndSleep(buildRestartCommand(), 3e3);
@@ -614,24 +611,19 @@ var BlueDevice = class extends EventEmitter {
 // src/device-manager.ts
 var logger3 = getLogger();
 var DeviceManager = class extends EventEmitter2 {
+  config;
   devices = /* @__PURE__ */ new Map();
-  deviceConfigs = [];
   reconnectTimers = /* @__PURE__ */ new Map();
   reconnectAttempts = /* @__PURE__ */ new Map();
   maxReconnectAttempts = 5;
   reconnectDelay = 1e4;
   // 10秒
-  defaultRssi = "-50";
-  constructor(deviceConfigs = [], defaultRssi = "-50") {
+  constructor(config) {
     super();
-    this.deviceConfigs = deviceConfigs;
-    this.defaultRssi = defaultRssi;
+    this.config = config;
   }
-  /**
-   * 添加设备配置
-   */
-  addDeviceConfig(config) {
-    this.deviceConfigs.push(config);
+  get deviceConfigs() {
+    return this.config.devices;
   }
   /**
    * 获取所有设备配置
@@ -656,7 +648,7 @@ var DeviceManager = class extends EventEmitter2 {
    * 初始化单个设备
    */
   async initializeDevice(config) {
-    const device = new BlueDevice(config.serialPath, config.deviceId);
+    const device = new BlueDevice(config.serialPath, config.deviceId, this.config.reportInterval);
     const deviceId = device.getDeviceId();
     device.on("device", (deviceData) => {
       logger3.info("DeviceManager", `[${deviceId}] \u4E0A\u62A5:`, deviceData);
@@ -724,7 +716,7 @@ var DeviceManager = class extends EventEmitter2 {
   /**
    * 启动扫描 - 支持指定设备或所有设备
    */
-  async startScan(rssi = this.defaultRssi, deviceId) {
+  async startScan(rssi = this.config.rssi, deviceId) {
     if (deviceId) {
       const device = this.devices.get(deviceId);
       if (!device) {
@@ -1409,7 +1401,8 @@ var AppController = class extends EventEmitter4 {
    * 初始化设备管理器
    */
   async initializeDeviceManager(configManager2) {
-    const deviceConfigs = configManager2.getDeviceConfigs();
+    const config = configManager2.getConfig();
+    const deviceConfigs = config.devices;
     if (deviceConfigs.length === 0) {
       throw new Error("\u6CA1\u6709\u542F\u7528\u7684\u8BBE\u5907\u914D\u7F6E");
     }
@@ -1417,8 +1410,7 @@ var AppController = class extends EventEmitter4 {
     deviceConfigs.forEach((device) => {
       logger8.info("AppController", `  - ${device.deviceId}: ${device.serialPath}`);
     });
-    const defaultRssi = configManager2.getConfig().rssi;
-    this.deviceManager = new DeviceManager(deviceConfigs, defaultRssi);
+    this.deviceManager = new DeviceManager(config);
     logger8.info("AppController", "\u8BBE\u5907\u7BA1\u7406\u5668\u521D\u59CB\u5316\u5B8C\u6210");
   }
   /**

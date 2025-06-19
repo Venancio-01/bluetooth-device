@@ -1,13 +1,9 @@
+import type { AppConfig, DeviceConfigWithOptions } from './config'
 import { EventEmitter } from 'events'
 import { BlueDevice } from './blue-device'
 import { getLogger } from './logger'
 
 const logger = getLogger()
-
-export interface DeviceConfig {
-  serialPath: string
-  deviceId?: string
-}
 
 export interface DeviceInfo {
   deviceId: string
@@ -18,31 +14,26 @@ export interface DeviceInfo {
 }
 
 export class DeviceManager extends EventEmitter {
+  private config: AppConfig
   private devices: Map<string, BlueDevice> = new Map()
-  private deviceConfigs: DeviceConfig[] = []
   private reconnectTimers: Map<string, NodeJS.Timeout> = new Map()
   private reconnectAttempts: Map<string, number> = new Map()
   private maxReconnectAttempts = 5
   private reconnectDelay = 10000 // 10秒
-  private defaultRssi: string = '-50'
 
-  constructor(deviceConfigs: DeviceConfig[] = [], defaultRssi: string = '-50') {
+  constructor(config: AppConfig) {
     super()
-    this.deviceConfigs = deviceConfigs
-    this.defaultRssi = defaultRssi
+    this.config = config
   }
 
-  /**
-   * 添加设备配置
-   */
-  addDeviceConfig(config: DeviceConfig) {
-    this.deviceConfigs.push(config)
+  get deviceConfigs() {
+    return this.config.devices
   }
 
   /**
    * 获取所有设备配置
    */
-  getDeviceConfigs(): DeviceConfig[] {
+  getDeviceConfigs(): DeviceConfigWithOptions[] {
     return [...this.deviceConfigs]
   }
 
@@ -65,8 +56,8 @@ export class DeviceManager extends EventEmitter {
   /**
    * 初始化单个设备
    */
-  private async initializeDevice(config: DeviceConfig): Promise<void> {
-    const device = new BlueDevice(config.serialPath, config.deviceId)
+  private async initializeDevice(config: DeviceConfigWithOptions): Promise<void> {
+    const device = new BlueDevice(config.serialPath, config.deviceId, this.config.reportInterval)
     const deviceId = device.getDeviceId()
 
     // 监听设备事件并转发
@@ -151,7 +142,7 @@ export class DeviceManager extends EventEmitter {
   /**
    * 启动扫描 - 支持指定设备或所有设备
    */
-  async startScan(rssi: string = this.defaultRssi, deviceId?: string): Promise<void> {
+  async startScan(rssi: string = this.config.rssi, deviceId?: string): Promise<void> {
     if (deviceId) {
       // 启动指定设备的扫描
       const device = this.devices.get(deviceId)
@@ -301,7 +292,7 @@ export class DeviceManager extends EventEmitter {
   /**
    * 调度设备重连
    */
-  private scheduleReconnect(config: DeviceConfig, deviceId: string) {
+  private scheduleReconnect(config: DeviceConfigWithOptions, deviceId: string) {
     const attempts = this.reconnectAttempts.get(deviceId) || 0
 
     if (attempts >= this.maxReconnectAttempts) {
