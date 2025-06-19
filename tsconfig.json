@@ -7,9 +7,6 @@
       "ESNext"
     ],
     "moduleDetection": "force",
-    "emitDecoratorMetadata": true,
-    // 装饰器支持
-    "experimentalDecorators": true,
     // 模块系统配置
     "module": "ESNext",
     "moduleResolution": "node",
