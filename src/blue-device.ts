@@ -302,7 +302,7 @@ export class BlueDevice extends EventEmitter {
     // 启动定时清除已检测设备
     this.startReportTimer()
 
-    const manufacturer = [...new Set(this.detectionResultList.map(item => item.mf))].join(',')
+    const manufacturer = [...new Set(this.getPreviouDetectionResult(1000).map(item => item.mf))].join(',')
     if (!manufacturer) return
     logger.info('BlueDevice', `[${this.deviceId}] 缓冲区检测结果:`, manufacturer)
 
@@ -324,6 +324,11 @@ export class BlueDevice extends EventEmitter {
     this.detectionResultList = this.detectionResultList.filter(item => Date.now() - item.timestamp < maxRetentionTime)
     // 添加新数据
     this.detectionResultList.push(result)
+  }
+
+  // 获取指定时间前的检测结果
+  getPreviouDetectionResult(timestamp: number) {
+    return this.detectionResultList.filter(item => Date.now() - item.timestamp < timestamp)
   }
 
   /**

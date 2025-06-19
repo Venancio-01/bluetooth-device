@@ -570,7 +570,7 @@ var BlueDevice = class extends EventEmitter {
   async startReport() {
     this.enableReport = true;
     this.startReportTimer();
-    const manufacturer = [...new Set(this.detectionResultList.map((item) => item.mf))].join(",");
+    const manufacturer = [...new Set(this.getPreviouDetectionResult(1e3).map((item) => item.mf))].join(",");
     if (!manufacturer) return;
     logger2.info("BlueDevice", `[${this.deviceId}] \u7F13\u51B2\u533A\u68C0\u6D4B\u7ED3\u679C:`, manufacturer);
     this.emit("device", {
@@ -585,6 +585,10 @@ var BlueDevice = class extends EventEmitter {
     const maxRetentionTime = 1e3;
     this.detectionResultList = this.detectionResultList.filter((item) => Date.now() - item.timestamp < maxRetentionTime);
     this.detectionResultList.push(result);
+  }
+  // 获取指定时间前的检测结果
+  getPreviouDetectionResult(timestamp) {
+    return this.detectionResultList.filter((item) => Date.now() - item.timestamp < timestamp);
   }
   /**
    * 重启设备
