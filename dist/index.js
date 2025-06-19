@@ -336,7 +336,7 @@ function buildRestartCommand() {
 function buildSetRoleCommand() {
   return `${AT_COMMAND_PREFIX}+${AT_SET_ROLE}${AT_COMMAND_SUFFIX}`;
 }
-function buildObserverCommand(rssi = "-60") {
+function buildObserverCommand(rssi) {
   return `${AT_COMMAND_PREFIX}+${AT_START_OBSERVER}${rssi}${AT_COMMAND_SUFFIX}`;
 }
 function buildStopObserverCommand() {
@@ -363,16 +363,18 @@ var BlueDevice = class extends EventEmitter {
   serialPath;
   deviceId;
   reportInterval;
+  defaultRssi;
   reportTimer = null;
   enableReport = false;
   // 检测结果列表
   detectionResultList = [];
-  constructor(serialPath = "/dev/ttyUSB0", deviceId, reportInterval = 5e3) {
+  constructor({ serialPath, deviceId, reportInterval, rssi }) {
     super();
     this.port = null;
     this.serialPath = serialPath;
     this.deviceId = deviceId || serialPath.replace(/[^a-z0-9]/gi, "_");
     this.reportInterval = reportInterval;
+    this.defaultRssi = rssi;
   }
   /**
    * 获取设备ID
@@ -517,7 +519,7 @@ var BlueDevice = class extends EventEmitter {
       await this.sendAndSleep(buildRestartCommand(), 2e3);
       await this.sendAndSleep(buildEnterCommandMode(), 1e3);
       this.initializeState = "initialized";
-      await this.startScan();
+      await this.startScan(this.defaultRssi);
       logger2.info("BlueDevice", `[${this.deviceId}] \u8BBE\u5907\u521D\u59CB\u5316\u5B8C\u6210`);
     } catch (error) {
       this.initializeState = "uninitialized";
@@ -526,7 +528,7 @@ var BlueDevice = class extends EventEmitter {
       throw error;
     }
   }
-  async startScan(rssi = "-50") {
+  async startScan(rssi) {
     try {
       if (this.initializeState === "uninitialized") {
         await this.initialize();
@@ -652,7 +654,12 @@ var DeviceManager = class extends EventEmitter2 {
    * 初始化单个设备
    */
   async initializeDevice(config) {
-    const device = new BlueDevice(config.serialPath, config.deviceId, this.config.reportInterval);
+    const device = new BlueDevice({
+      serialPath: config.serialPath,
+      deviceId: config.deviceId || "",
+      reportInterval: this.config.reportInterval,
+      rssi: this.config.rssi
+    });
     const deviceId = device.getDeviceId();
     device.on("device", (deviceData) => {
       logger3.info("DeviceManager", `[${deviceId}] \u4E0A\u62A5:`, deviceData);

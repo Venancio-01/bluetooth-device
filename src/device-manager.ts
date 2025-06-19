@@ -57,7 +57,12 @@ export class DeviceManager extends EventEmitter {
    * 初始化单个设备
    */
   private async initializeDevice(config: DeviceConfigWithOptions): Promise<void> {
-    const device = new BlueDevice(config.serialPath, config.deviceId, this.config.reportInterval)
+    const device = new BlueDevice({
+      serialPath: config.serialPath,
+      deviceId: config.deviceId || '',
+      reportInterval: this.config.reportInterval,
+      rssi: this.config.rssi,
+    })
     const deviceId = device.getDeviceId()
 
     // 监听设备事件并转发

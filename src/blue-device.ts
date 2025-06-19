@@ -32,17 +32,19 @@ export class BlueDevice extends EventEmitter {
   private readonly serialPath: string
   private readonly deviceId: string
   private readonly reportInterval: number
+  private readonly defaultRssi: string
   private reportTimer: NodeJS.Timeout | null = null
   private enableReport = false
   // 检测结果列表
   private detectionResultList: DetectionResult[] = []
 
-  constructor(serialPath: string = '/dev/ttyUSB0', deviceId?: string, reportInterval: number = 5000) {
+  constructor({ serialPath, deviceId, reportInterval, rssi }: { serialPath: string, deviceId?: string, reportInterval: number, rssi: string }) {
     super()
     this.port = null
     this.serialPath = serialPath
     this.deviceId = deviceId || serialPath.replace(/[^a-z0-9]/gi, '_')
     this.reportInterval = reportInterval
+    this.defaultRssi = rssi
   }
 
   /**
@@ -232,7 +234,7 @@ export class BlueDevice extends EventEmitter {
       this.initializeState = 'initialized'
 
       // 开始扫描
-      await this.startScan()
+      await this.startScan(this.defaultRssi)
 
       logger.info('BlueDevice', `[${this.deviceId}] 设备初始化完成`)
     }
@@ -244,7 +246,7 @@ export class BlueDevice extends EventEmitter {
     }
   }
 
-  async startScan(rssi = '-50') {
+  async startScan(rssi: string) {
     try {
       if (this.initializeState === 'uninitialized') {
         await this.initialize()

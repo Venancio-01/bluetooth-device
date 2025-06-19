@@ -46,7 +46,7 @@ export function parseQueryRoleCommand(data: string) {
 /**
  * 设置设备为观察者模式
  */
-export function buildObserverCommand(rssi = '-60') {
+export function buildObserverCommand(rssi: string) {
   return `${AT_COMMAND_PREFIX}+${AT_START_OBSERVER}${rssi}${AT_COMMAND_SUFFIX}`
 }
 
