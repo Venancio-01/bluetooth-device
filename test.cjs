@@ -119,7 +119,7 @@ function main() {
   })
 
   port.on('data', (data) => {
-    console.log('data', data)
+    console.log('data', data.toString('utf-8'))
   })
 }
 
