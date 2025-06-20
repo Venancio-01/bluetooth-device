@@ -27,11 +27,12 @@ export class DeviceManager extends EventEmitter {
   }
 
   get deviceConfigs() {
-    return this.config.devices
+    // 只返回启用的设备配置
+    return this.config.devices.filter(device => device.enabled)
   }
 
   /**
-   * 获取所有设备配置
+   * 获取所有设备配置（仅启用的设备）
    */
   getDeviceConfigs(): DeviceConfigWithOptions[] {
     return [...this.deviceConfigs]
@@ -203,22 +204,22 @@ export class DeviceManager extends EventEmitter {
   /**
    * 启动上报 - 支持指定设备或所有设备
    */
-  async startReport(deviceId?: string): Promise<void> {
+  async startReport(rssi?: string, deviceId?: string): Promise<void> {
     if (deviceId) {
       // 启动指定设备的扫描
       const device = this.devices.get(deviceId)
       if (!device) {
         throw new Error(`设备 ${deviceId} 不存在`)
       }
-      await device.startReport()
-      logger.info('DeviceManager', `[${deviceId}] 开始上报`)
+      await device.startReport(rssi)
+      logger.info('DeviceManager', `[${deviceId}] 开始上报`, { rssi: rssi || '使用默认值' })
     }
     else {
       // 启动所有设备的扫描
       const startPromises = Array.from(this.devices.entries()).map(async ([id, device]) => {
         try {
-          await device.startReport()
-          logger.info('DeviceManager', `[${id}] 开始上报`)
+          await device.startReport(rssi)
+          logger.info('DeviceManager', `[${id}] 开始上报`, { rssi: rssi || '使用默认值' })
         }
         catch (error) {
           logger.error('DeviceManager', `[${id}] 启动上报失败:`, error)

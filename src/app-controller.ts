@@ -142,15 +142,25 @@ export class AppController extends EventEmitter {
    */
   private async initializeDeviceManager(configManager: ConfigManager) {
     const config = configManager.getConfig()
-    const deviceConfigs = config.devices
+    const deviceConfigs = configManager.getDeviceConfigs() // 使用过滤后的设备配置
     if (deviceConfigs.length === 0) {
       throw new Error('没有启用的设备配置')
     }
 
-    logger.info('AppController', `加载了 ${deviceConfigs.length} 个设备配置:`)
+    logger.info('AppController', `加载了 ${deviceConfigs.length} 个启用的设备配置:`)
     deviceConfigs.forEach((device) => {
-      logger.info('AppController', `  - ${device.deviceId}: ${device.serialPath}`)
+      logger.info('AppController', `  - ${device.deviceId}: ${device.serialPath} (enabled: ${device.enabled})`)
     })
+
+    // 检查是否有被禁用的设备
+    const allDevices = config.devices
+    const disabledDevices = allDevices.filter(device => !device.enabled)
+    if (disabledDevices.length > 0) {
+      logger.info('AppController', `跳过了 ${disabledDevices.length} 个禁用的设备配置:`)
+      disabledDevices.forEach((device) => {
+        logger.info('AppController', `  - ${device.deviceId}: ${device.serialPath} (enabled: ${device.enabled})`)
+      })
+    }
 
     this.deviceManager = new DeviceManager(config)
     logger.info('AppController', '设备管理器初始化完成')
@@ -172,7 +182,9 @@ export class AppController extends EventEmitter {
     if (!this.deviceManager) {
       throw new Error('设备管理器未初始化')
     }
-    this.messageHandler = new MessageHandler(this.deviceManager)
+    const configManager = getConfigManager()
+    const config = configManager.getConfig()
+    this.messageHandler = new MessageHandler(this.deviceManager, config)
     logger.info('AppController', '消息处理器初始化完成')
   }
 

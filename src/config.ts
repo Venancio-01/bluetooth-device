@@ -26,6 +26,7 @@ const SerialTransportConfigSchema = z.object({
 const AppConfigSchema = z.object({
   devices: z.array(DeviceConfigSchema),
   rssi: z.string().optional().default('-50'),
+  useConfigRssi: z.boolean().optional().default(true),
   reportInterval: z.number().optional().default(5000),
   serialTransport: SerialTransportConfigSchema.optional().default({ serialPath: '/dev/ttyUSB0', baudRate: 115200, dataBits: 8, stopBits: 1, parity: 'none', timeout: 5000 }),
   logging: z.object({
@@ -48,6 +49,7 @@ const DEFAULT_CONFIG: AppConfig = {
     },
   ],
   rssi: '-50',
+  useConfigRssi: false,
   reportInterval: 5000,
   serialTransport: {
     serialPath: '/dev/ttyUSB1',
@@ -172,19 +174,6 @@ export class ConfigManager {
     this.config.devices = this.config.devices.filter(device => device.serialPath !== serialPath)
 
     if (this.config.devices.length < initialLength) {
-      this.saveConfig(this.config)
-      return true
-    }
-    return false
-  }
-
-  /**
-   * 启用/禁用设备
-   */
-  setDeviceEnabled(serialPath: string, enabled: boolean): boolean {
-    const device = this.config.devices.find(d => d.serialPath === serialPath)
-    if (device) {
-      device.enabled = enabled
       this.saveConfig(this.config)
       return true
     }

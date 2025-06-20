@@ -138,6 +138,7 @@ var SerialTransportConfigSchema = z.object({
 var AppConfigSchema = z.object({
   devices: z.array(DeviceConfigSchema),
   rssi: z.string().optional().default("-50"),
+  useConfigRssi: z.boolean().optional().default(true),
   reportInterval: z.number().optional().default(5e3),
   serialTransport: SerialTransportConfigSchema.optional().default({ serialPath: "/dev/ttyUSB0", baudRate: 115200, dataBits: 8, stopBits: 1, parity: "none", timeout: 5e3 }),
   logging: z.object({
@@ -155,6 +156,7 @@ var DEFAULT_CONFIG = {
     }
   ],
   rssi: "-50",
+  useConfigRssi: false,
   reportInterval: 5e3,
   serialTransport: {
     serialPath: "/dev/ttyUSB1",
@@ -255,18 +257,6 @@ var ConfigManager = class {
     const initialLength = this.config.devices.length;
     this.config.devices = this.config.devices.filter((device) => device.serialPath !== serialPath);
     if (this.config.devices.length < initialLength) {
-      this.saveConfig(this.config);
-      return true;
-    }
-    return false;
-  }
-  /**
-   * 启用/禁用设备
-   */
-  setDeviceEnabled(serialPath, enabled) {
-    const device = this.config.devices.find((d) => d.serialPath === serialPath);
-    if (device) {
-      device.enabled = enabled;
       this.saveConfig(this.config);
       return true;
     }
@@ -569,7 +559,18 @@ var BlueDevice = class extends EventEmitter {
       throw error;
     }
   }
-  async startReport() {
+  async startReport(rssi) {
+    if (rssi && rssi !== this.defaultRssi && this.isScanning) {
+      logger2.info("BlueDevice", `[${this.deviceId}] RSSI \u503C\u53D8\u66F4\uFF0C\u91CD\u65B0\u542F\u52A8\u626B\u63CF`, {
+        oldRssi: this.defaultRssi,
+        newRssi: rssi
+      });
+      await this.stopScan();
+      await this.startScan(rssi);
+    } else if (!this.isScanning) {
+      const targetRssi = rssi || this.defaultRssi;
+      await this.startScan(targetRssi);
+    }
     this.enableReport = true;
     this.startReportTimer();
     const manufacturer = [...new Set(this.getPreviouDetectionResult(1e3).map((item) => item.mf))].join(",");
@@ -629,10 +630,10 @@ var DeviceManager = class extends EventEmitter2 {
     this.config = config;
   }
   get deviceConfigs() {
-    return this.config.devices;
+    return this.config.devices.filter((device) => device.enabled);
   }
   /**
-   * 获取所有设备配置
+   * 获取所有设备配置（仅启用的设备）
    */
   getDeviceConfigs() {
     return [...this.deviceConfigs];
@@ -773,19 +774,19 @@ var DeviceManager = class extends EventEmitter2 {
   /**
    * 启动上报 - 支持指定设备或所有设备
    */
-  async startReport(deviceId) {
+  async startReport(rssi, deviceId) {
     if (deviceId) {
       const device = this.devices.get(deviceId);
       if (!device) {
         throw new Error(`\u8BBE\u5907 ${deviceId} \u4E0D\u5B58\u5728`);
       }
-      await device.startReport();
-      logger3.info("DeviceManager", `[${deviceId}] \u5F00\u59CB\u4E0A\u62A5`);
+      await device.startReport(rssi);
+      logger3.info("DeviceManager", `[${deviceId}] \u5F00\u59CB\u4E0A\u62A5`, { rssi: rssi || "\u4F7F\u7528\u9ED8\u8BA4\u503C" });
     } else {
       const startPromises = Array.from(this.devices.entries()).map(async ([id, device]) => {
         try {
-          await device.startReport();
-          logger3.info("DeviceManager", `[${id}] \u5F00\u59CB\u4E0A\u62A5`);
+          await device.startReport(rssi);
+          logger3.info("DeviceManager", `[${id}] \u5F00\u59CB\u4E0A\u62A5`, { rssi: rssi || "\u4F7F\u7528\u9ED8\u8BA4\u503C" });
         } catch (error) {
           logger3.error("DeviceManager", `[${id}] \u542F\u52A8\u4E0A\u62A5\u5931\u8D25:`, error);
         }
@@ -1057,8 +1058,10 @@ var HeartbeatManager = class {
 var logger6 = getLogger();
 var MessageHandler = class {
   deviceManager;
-  constructor(deviceManager) {
+  config;
+  constructor(deviceManager, config) {
     this.deviceManager = deviceManager;
+    this.config = config;
   }
   /**
    * 处理来自传输层的消息
@@ -1108,11 +1111,21 @@ var MessageHandler = class {
    */
   async handleStartCommand(requestData) {
     const data = parseRequestData(requestData);
-    const rssi = data?.rssi || "-60";
-    logger6.info("MessageHandler", "\u6536\u5230\u542F\u52A8\u626B\u63CF\u6307\u4EE4", { rssi });
+    let rssi;
+    if (this.config.useConfigRssi) {
+      rssi = this.config.rssi;
+      logger6.info("MessageHandler", "\u4F7F\u7528\u914D\u7F6E\u6587\u4EF6\u4E2D\u7684 RSSI \u503C", { rssi });
+    } else {
+      rssi = data?.rssi || this.config.rssi;
+      logger6.info("MessageHandler", "\u4F7F\u7528\u4E0A\u4F4D\u673A\u4F20\u5165\u7684 RSSI \u503C", { rssi: data?.rssi, defaultRssi: this.config.rssi });
+    }
+    logger6.info("MessageHandler", "\u6536\u5230\u542F\u52A8\u626B\u63CF\u6307\u4EE4", {
+      rssi,
+      useConfigRssi: this.config.useConfigRssi
+    });
     try {
-      await this.deviceManager.startReport();
-      logger6.info("MessageHandler", "\u6240\u6709\u8BBE\u5907\u5F00\u59CB\u4E0A\u62A5");
+      await this.deviceManager.startReport(rssi);
+      logger6.info("MessageHandler", "\u6240\u6709\u8BBE\u5907\u5F00\u59CB\u4E0A\u62A5", { rssi });
       return createStatusResponse({ msg: "Report started" });
     } catch (error) {
       logger6.error("MessageHandler", "\u542F\u52A8\u4E0A\u62A5\u5931\u8D25:", error);
@@ -1413,14 +1426,22 @@ var AppController = class extends EventEmitter4 {
    */
   async initializeDeviceManager(configManager2) {
     const config = configManager2.getConfig();
-    const deviceConfigs = config.devices;
+    const deviceConfigs = configManager2.getDeviceConfigs();
     if (deviceConfigs.length === 0) {
       throw new Error("\u6CA1\u6709\u542F\u7528\u7684\u8BBE\u5907\u914D\u7F6E");
     }
-    logger8.info("AppController", `\u52A0\u8F7D\u4E86 ${deviceConfigs.length} \u4E2A\u8BBE\u5907\u914D\u7F6E:`);
+    logger8.info("AppController", `\u52A0\u8F7D\u4E86 ${deviceConfigs.length} \u4E2A\u542F\u7528\u7684\u8BBE\u5907\u914D\u7F6E:`);
     deviceConfigs.forEach((device) => {
-      logger8.info("AppController", `  - ${device.deviceId}: ${device.serialPath}`);
+      logger8.info("AppController", `  - ${device.deviceId}: ${device.serialPath} (enabled: ${device.enabled})`);
     });
+    const allDevices = config.devices;
+    const disabledDevices = allDevices.filter((device) => !device.enabled);
+    if (disabledDevices.length > 0) {
+      logger8.info("AppController", `\u8DF3\u8FC7\u4E86 ${disabledDevices.length} \u4E2A\u7981\u7528\u7684\u8BBE\u5907\u914D\u7F6E:`);
+      disabledDevices.forEach((device) => {
+        logger8.info("AppController", `  - ${device.deviceId}: ${device.serialPath} (enabled: ${device.enabled})`);
+      });
+    }
     this.deviceManager = new DeviceManager(config);
     logger8.info("AppController", "\u8BBE\u5907\u7BA1\u7406\u5668\u521D\u59CB\u5316\u5B8C\u6210");
   }
@@ -1439,7 +1460,9 @@ var AppController = class extends EventEmitter4 {
     if (!this.deviceManager) {
       throw new Error("\u8BBE\u5907\u7BA1\u7406\u5668\u672A\u521D\u59CB\u5316");
     }
-    this.messageHandler = new MessageHandler(this.deviceManager);
+    const configManager2 = getConfigManager();
+    const config = configManager2.getConfig();
+    this.messageHandler = new MessageHandler(this.deviceManager, config);
     logger8.info("AppController", "\u6D88\u606F\u5904\u7406\u5668\u521D\u59CB\u5316\u5B8C\u6210");
   }
   /**

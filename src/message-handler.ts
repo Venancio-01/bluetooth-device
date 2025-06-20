@@ -1,3 +1,4 @@
+import type { AppConfig } from './config'
 import type { DeviceManager } from './device-manager'
 import type { ResponseCallback } from './serial-transport'
 import {
@@ -18,9 +19,11 @@ const logger = getLogger()
  */
 export class MessageHandler {
   private deviceManager: DeviceManager
+  private config: AppConfig
 
-  constructor(deviceManager: DeviceManager) {
+  constructor(deviceManager: DeviceManager, config: AppConfig) {
     this.deviceManager = deviceManager
+    this.config = config
   }
 
   /**
@@ -79,9 +82,24 @@ export class MessageHandler {
    */
   private async handleStartCommand(requestData: unknown): Promise<string> {
     const data = parseRequestData(requestData)
-    const rssi = data?.rssi || '-60'
 
-    logger.info('MessageHandler', '收到启动扫描指令', { rssi })
+    // 根据 useConfigRssi 配置决定使用哪个 RSSI 值
+    let rssi: string
+    if (this.config.useConfigRssi) {
+      // 使用配置文件中的 RSSI 值
+      rssi = this.config.rssi
+      logger.info('MessageHandler', '使用配置文件中的 RSSI 值', { rssi })
+    }
+    else {
+      // 使用上位机传入的 RSSI 值，如果没有传入则使用配置文件中的值作为默认值
+      rssi = data?.rssi || this.config.rssi
+      logger.info('MessageHandler', '使用上位机传入的 RSSI 值', { rssi: data?.rssi, defaultRssi: this.config.rssi })
+    }
+
+    logger.info('MessageHandler', '收到启动扫描指令', {
+      rssi,
+      useConfigRssi: this.config.useConfigRssi,
+    })
 
     // try {
     //   await this.deviceManager.startScan(rssi)
@@ -94,8 +112,8 @@ export class MessageHandler {
     // }
 
     try {
-      await this.deviceManager.startReport()
-      logger.info('MessageHandler', '所有设备开始上报')
+      await this.deviceManager.startReport(rssi)
+      logger.info('MessageHandler', '所有设备开始上报', { rssi })
       return createStatusResponse({ msg: 'Report started' })
     }
     catch (error: any) {

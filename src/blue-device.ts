@@ -299,7 +299,22 @@ export class BlueDevice extends EventEmitter {
     }
   }
 
-  async startReport() {
+  async startReport(rssi?: string) {
+    // 如果传入了新的 RSSI 值，需要重新启动扫描
+    if (rssi && rssi !== this.defaultRssi && this.isScanning) {
+      logger.info('BlueDevice', `[${this.deviceId}] RSSI 值变更，重新启动扫描`, {
+        oldRssi: this.defaultRssi,
+        newRssi: rssi,
+      })
+      await this.stopScan()
+      await this.startScan(rssi)
+    }
+    else if (!this.isScanning) {
+      // 如果没有在扫描，使用指定的 RSSI 或默认 RSSI 启动扫描
+      const targetRssi = rssi || this.defaultRssi
+      await this.startScan(targetRssi)
+    }
+
     this.enableReport = true
     // 启动定时清除已检测设备
     this.startReportTimer()

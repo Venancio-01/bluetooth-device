@@ -13,15 +13,10 @@
       "enabled": false
     }
   ],
-  "rssi": "-55",
+  "rssi": "-60",
+  "useConfigRssi": true,
   "reportInterval": 6000,
-  "enabledTransports": "serial",
-  "httpTransport": {
-    "type": "http",
-    "port": 8888
-  },
   "serialTransport": {
-    "type": "serial",
     "serialPath": "/dev/ttyS3",
     "baudRate": 115200,
     "dataBits": 8,
