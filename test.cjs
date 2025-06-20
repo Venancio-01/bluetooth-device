@@ -14,49 +14,49 @@ const AT_STOP_OBSERVER = 'OBSERVER=0'
 /**
  * 进入AT命令模式
  */
-export function buildEnterCommandMode() {
+function buildEnterCommandMode() {
   return `${AT_COMMAND_MODE}`
 }
 
 /**
  * 重启设备
  */
-export function buildRestartCommand() {
+function buildRestartCommand() {
   return `${AT_COMMAND_PREFIX}+${AT_RESTART}${AT_COMMAND_SUFFIX}`
 }
 
 /**
  * 设置设备为单主角色
  */
-export function buildSetRoleCommand() {
+function buildSetRoleCommand() {
   return `${AT_COMMAND_PREFIX}+${AT_SET_ROLE}${AT_COMMAND_SUFFIX}`
 }
 
 /**
  * 获取设备角色
  */
-export function buildQueryRoleCommand() {
+function buildQueryRoleCommand() {
   return `${AT_COMMAND_PREFIX}+${AT_GET_ROLE}${AT_COMMAND_SUFFIX}`
 }
 
 /**
  * 获取设备角色
  */
-export function parseQueryRoleCommand(data) {
+function parseQueryRoleCommand(data) {
   return data.split('=')[1]
 }
 
 /**
  * 设置设备为观察者模式
  */
-export function buildObserverCommand(rssi) {
+function buildObserverCommand(rssi) {
   return `${AT_COMMAND_PREFIX}+${AT_START_OBSERVER}${rssi}${AT_COMMAND_SUFFIX}`
 }
 
 /**
  * 停止观察者模式
  */
-export function buildStopObserverCommand() {
+function buildStopObserverCommand() {
   return `${AT_COMMAND_PREFIX}+${AT_STOP_OBSERVER}${AT_COMMAND_SUFFIX}`
 }
 
