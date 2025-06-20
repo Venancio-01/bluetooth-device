@@ -13,7 +13,7 @@
       "enabled": false
     }
   ],
-  "rssi": "-60",
+  "rssi": "-53",
   "useConfigRssi": true,
   "reportInterval": 6000,
   "serialTransport": {
