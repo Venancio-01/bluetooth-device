@@ -1,13 +1,13 @@
 {
   "devices": [
     {
-      "serialPath": "/dev/ttyUSB0",
+      "serialPath": "/dev/ttyS3",
       "deviceId": "bluetooth_device_0",
       "baudRate": 115200,
       "enabled": true
     },
     {
-      "serialPath": "/dev/ttyUSB1",
+      "serialPath": "/dev/ttyS2",
       "deviceId": "bluetooth_device_1",
       "baudRate": 115200,
       "enabled": false
@@ -15,9 +15,9 @@
   ],
   "rssi": "-53",
   "useConfigRssi": true,
-  "reportInterval": 6000,
+  "reportInterval": 2000,
   "serialTransport": {
-    "serialPath": "/dev/ttyS3",
+    "serialPath": "/dev/ttyS1",
     "baudRate": 115200,
     "dataBits": 8,
     "stopBits": 1,
