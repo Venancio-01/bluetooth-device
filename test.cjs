@@ -105,7 +105,7 @@ async function init() {
 
 function main() {
   port = new SerialPort({
-    path: '/dev/ttyS3',
+    path: '/dev/ttyS1',
     baudRate: 115200,
     dataBits: 8,
     stopBits: 1,
@@ -115,7 +115,11 @@ function main() {
 
   port.on('open', () => {
     console.log('open')
-    init()
+    // init()
+
+    setTimeout(() => {
+      sendAndSleep(buildObserverCommand('-53'), 500)
+    }, 1000)
   })
 
   port.on('data', (data) => {
