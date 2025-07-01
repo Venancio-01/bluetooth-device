@@ -115,11 +115,11 @@ function main() {
 
   port.on('open', () => {
     console.log('open')
-    // init()
+    init()
 
-    setTimeout(() => {
-      sendAndSleep(buildObserverCommand('-53'), 500)
-    }, 1000)
+    // setTimeout(() => {
+    //   sendAndSleep(buildObserverCommand('-53'), 500)
+    // }, 1000)
   })
 
   port.on('data', (data) => {
