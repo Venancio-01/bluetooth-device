@@ -105,7 +105,7 @@ async function init() {
 
 function main() {
   port = new SerialPort({
-    path: '/dev/ttyS1',
+    path: '/dev/ttyS3',
     baudRate: 115200,
     dataBits: 8,
     stopBits: 1,
@@ -123,6 +123,7 @@ function main() {
   })
 
   port.on('data', (data) => {
+    // console.log('data', data)
     console.log('data', data.toString('utf-8'))
   })
 }
