@@ -28,7 +28,7 @@ const AppConfigSchema = z.object({
   rssi: z.string().optional().default('-50'),
   useConfigRssi: z.boolean().optional().default(true),
   reportInterval: z.number().optional().default(5000),
-  serialTransport: SerialTransportConfigSchema.optional().default({ serialPath: '/dev/ttyUSB0', baudRate: 115200, dataBits: 8, stopBits: 1, parity: 'none', timeout: 5000 }),
+  serialTransport: SerialTransportConfigSchema.optional().default({ serialPath: '/dev/ttyS3', baudRate: 115200, dataBits: 8, stopBits: 1, parity: 'none', timeout: 5000 }),
   logging: z.object({
     level: z.enum(['debug', 'info', 'warn', 'error']).optional().default('info'),
     enableDevicePrefix: z.boolean().optional().default(true),
@@ -42,7 +42,7 @@ export type SerialTransportConfig = z.infer<typeof SerialTransportConfigSchema>
 const DEFAULT_CONFIG: AppConfig = {
   devices: [
     {
-      serialPath: '/dev/ttyUSB0',
+      serialPath: '/dev/ttyS3',
       deviceId: 'device_0',
       baudRate: 115200,
       enabled: true,
@@ -52,7 +52,7 @@ const DEFAULT_CONFIG: AppConfig = {
   useConfigRssi: false,
   reportInterval: 5000,
   serialTransport: {
-    serialPath: '/dev/ttyUSB1',
+    serialPath: '/dev/ttyS1',
     baudRate: 115200,
     dataBits: 8,
     stopBits: 1,

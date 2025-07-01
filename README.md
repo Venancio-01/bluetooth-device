@@ -33,7 +33,7 @@ cp config.example.json config.json
 {
   "devices": [
     {
-      "serialPath": "/dev/ttyUSB0",
+      "serialPath": "/dev/ttyS3",
       "deviceId": "bluetooth_device_0",
       "baudRate": 115200,
       "enabled": true
@@ -205,7 +205,7 @@ GET /events
   "d": {
     "mf": "Apple, Inc.",
     "did": "bluetooth_device_0",
-    "sp": "/dev/ttyUSB0"
+    "sp": "/dev/ttyS3"
   }
 }
 ```
@@ -314,7 +314,7 @@ npm run lint
 {
   "devices": [
     {
-      "serialPath": "/dev/ttyUSB0",
+      "serialPath": "/dev/ttyS3",
       "deviceId": "device_0",
       "enabled": true
     }
@@ -331,7 +331,7 @@ npm run lint
   "d": {
     "mf": "Apple, Inc.",
     "did": "device_0",
-    "sp": "/dev/ttyUSB0"
+    "sp": "/dev/ttyS3"
   }
 }
 ```
@@ -340,7 +340,7 @@ npm run lint
 可以通过环境变量快速配置：
 
 ```bash
-export SERIAL_PORTS="/dev/ttyUSB0,/dev/ttyUSB1"
+export SERIAL_PORTS="/dev/ttyS3,/dev/ttyUSB1"
 export HTTP_PORT=8888
 export LOG_LEVEL=info
 ```
