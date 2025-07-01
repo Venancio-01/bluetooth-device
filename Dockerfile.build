@@ -1,0 +1,31 @@
+
+# Use the full-featured "bookworm" version of the Node.js 20 image
+FROM node:20-bookworm
+
+# Set proxy for network requests during the build
+ENV http_proxy="http://192.168.110.228:20172"
+ENV https_proxy="http://192.168.110.228:20172"
+
+# Install essential build tools and create a symlink for python
+RUN apt-get update && apt-get install -y build-essential python3 make g++     && ln -s /usr/bin/python3 /usr/bin/python
+
+# Set the working directory
+WORKDIR /app
+
+# Copy package manifests
+COPY package.json pnpm-lock.yaml ./
+
+# Install pnpm
+RUN npm install -g pnpm
+
+# Install project dependencies
+RUN pnpm install
+
+# Copy the rest of the project source code
+COPY . .
+
+# Build the TypeScript source into JavaScript
+RUN pnpm run build
+
+# Run the packaging command to build the armv7 binary
+RUN pnpm run package
