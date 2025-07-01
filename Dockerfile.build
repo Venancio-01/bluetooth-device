@@ -1,0 +1,25 @@
+
+# 使用官方的 Node.js 20 镜像作为基础
+FROM node:20
+
+# 设置工作目录
+WORKDIR /app
+
+# 复制 package.json 和 pnpm-lock.yaml
+COPY package.json pnpm-lock.yaml ./
+
+# 安装 pnpm
+RUN npm install -g pnpm
+
+# 安装项目依赖
+RUN pnpm install
+
+# 复制项目源代码
+COPY . .
+
+# 运行构建，将 TypeScript 编译成 JavaScript
+RUN pnpm run build
+
+# 运行打包命令，生成 armv7 二进制文件
+RUN pnpm run package
+

@@ -1,16 +1,18 @@
 // src/index.ts
-import process2 from "process";
+import process from "process";
 
 // src/app-controller.ts
 import { EventEmitter as EventEmitter4 } from "events";
 
 // src/config.ts
-import fs from "fs";
-import path from "path";
-import process from "process";
+import fs2 from "fs";
+import path2 from "path";
 import { z } from "zod";
 
 // src/utils.ts
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -24,6 +26,19 @@ function getFormattedDateTimeWithMilliseconds() {
   const seconds = now.getSeconds().toString().padStart(2, "0");
   const milliseconds = now.getMilliseconds().toString().padStart(3, "0");
   return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}.${milliseconds}`;
+}
+function getProjectRoot() {
+  const currentFileUrl = import.meta.url;
+  const currentFilePath = fileURLToPath(currentFileUrl);
+  const currentDir = path.dirname(currentFilePath);
+  let projectRoot = currentDir;
+  while (projectRoot !== path.dirname(projectRoot)) {
+    if (fs.existsSync(path.join(projectRoot, "package.json"))) {
+      break;
+    }
+    projectRoot = path.dirname(projectRoot);
+  }
+  return projectRoot;
 }
 
 // src/logger.ts
@@ -182,18 +197,16 @@ var ConfigManager = class {
    * 获取默认配置文件路径
    */
   getDefaultConfigPath() {
-    if (process.env["CONFIG_PATH"]) {
-      return process.env["CONFIG_PATH"];
-    }
-    return path.join(process.cwd(), "config.json");
+    const projectRoot = getProjectRoot();
+    return path2.join(projectRoot, "config.json");
   }
   /**
    * 加载配置
    */
   loadConfig() {
     try {
-      if (fs.existsSync(this.configPath)) {
-        const configContent = fs.readFileSync(this.configPath, "utf-8");
+      if (fs2.existsSync(this.configPath)) {
+        const configContent = fs2.readFileSync(this.configPath, "utf-8");
         const jsonConfig = JSON.parse(configContent);
         const validatedConfig = AppConfigSchema.parse(jsonConfig);
         logger.info("ConfigManager", `\u4ECE\u914D\u7F6E\u6587\u4EF6\u52A0\u8F7D\u914D\u7F6E: ${this.configPath}`);
@@ -213,7 +226,7 @@ var ConfigManager = class {
   saveConfig(config) {
     try {
       const configContent = JSON.stringify(config, null, 2);
-      fs.writeFileSync(this.configPath, configContent, "utf-8");
+      fs2.writeFileSync(this.configPath, configContent, "utf-8");
       logger.info("ConfigManager", `\u914D\u7F6E\u5DF2\u4FDD\u5B58\u5230: ${this.configPath}`);
     } catch (error) {
       logger.error("ConfigManager", "\u4FDD\u5B58\u914D\u7F6E\u5931\u8D25:", error);
@@ -278,7 +291,7 @@ var ConfigManager = class {
       errors.push("\u81F3\u5C11\u9700\u8981\u542F\u7528\u4E00\u4E2A\u8BBE\u5907");
     }
     const serialPaths = enabledDevices.map((d) => d.serialPath);
-    const duplicates = serialPaths.filter((path2, index) => serialPaths.indexOf(path2) !== index);
+    const duplicates = serialPaths.filter((path3, index) => serialPaths.indexOf(path3) !== index);
     if (duplicates.length > 0) {
       errors.push(`\u4E32\u53E3\u8DEF\u5F84\u91CD\u590D: ${duplicates.join(", ")}`);
     }
@@ -1554,10 +1567,10 @@ async function main() {
     logger9.info("Main", "\u84DD\u7259\u8BBE\u5907\u68C0\u6D4B\u7CFB\u7EDF\u542F\u52A8\u6210\u529F");
   } catch (error) {
     logger9.error("Main", "\u542F\u52A8\u5931\u8D25:", error);
-    process2.exit(1);
+    process.exit(1);
   }
 }
-process2.on("SIGINT", async () => {
+process.on("SIGINT", async () => {
   logger9.info("Main", "\n\u6B63\u5728\u5173\u95ED\u7A0B\u5E8F...");
   try {
     if (appController) {
@@ -1567,7 +1580,7 @@ process2.on("SIGINT", async () => {
   } catch (error) {
     logger9.error("Main", "\u5173\u95ED\u7A0B\u5E8F\u65F6\u53D1\u751F\u9519\u8BEF:", error);
   }
-  process2.exit();
+  process.exit();
 });
 main();
 //# sourceMappingURL=index.js.map

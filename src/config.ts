@@ -3,6 +3,7 @@ import path from 'path'
 import process from 'process'
 import { z } from 'zod'
 import { getLogger } from './logger'
+import { getProjectRoot } from './utils'
 
 const logger = getLogger()
 
@@ -81,13 +82,8 @@ export class ConfigManager {
    * 获取默认配置文件路径
    */
   private getDefaultConfigPath(): string {
-    // 优先使用环境变量指定的配置文件路径
-    if (process.env['CONFIG_PATH']) {
-      return process.env['CONFIG_PATH']
-    }
-
-    // 默认配置文件路径
-    return path.join(process.cwd(), 'config.json')
+    const projectRoot = getProjectRoot()
+    return path.join(projectRoot, 'config.json')
   }
 
   /**
