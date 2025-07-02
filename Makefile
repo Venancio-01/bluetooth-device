@@ -42,10 +42,9 @@ clean:
 	@rm -rf $(RELEASE_DIR)
 
 # 创建构建目录
-$(BUILD_DIR):
+.PHONY: create-dirs
+create-dirs:
 	@mkdir -p $(BUILD_DIR)
-
-$(RELEASE_DIR):
 	@mkdir -p $(RELEASE_DIR)
 
 # 下载依赖
@@ -69,14 +68,14 @@ vet:
 
 # 构建本地版本（当前架构）
 .PHONY: build-local
-build-local: $(BUILD_DIR) deps fmt vet
+build-local: create-dirs deps fmt vet
 	@echo "构建本地版本..."
 	@$(GO) build $(BUILD_FLAGS) -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/$(BINARY_NAME)-local $(MAIN_FILE)
 	@echo "构建完成: $(BUILD_DIR)/$(BINARY_NAME)-local"
 
 # 构建 ARM v7 版本（OrangePi）
 .PHONY: build
-build: $(BUILD_DIR) deps fmt vet
+build: create-dirs deps fmt vet
 	@echo "构建 ARM v7 版本..."
 	@GOOS=$(GOOS) GOARCH=$(GOARCH) GOARM=$(GOARM) $(GO) build \
 		$(BUILD_FLAGS) -ldflags "$(LDFLAGS)" \
@@ -85,7 +84,7 @@ build: $(BUILD_DIR) deps fmt vet
 
 # 快速构建（跳过检查）
 .PHONY: quick
-quick: $(BUILD_DIR) deps
+quick: create-dirs deps
 	@echo "快速构建 ARM v7 版本..."
 	@GOOS=$(GOOS) GOARCH=$(GOARCH) GOARM=$(GOARM) $(GO) build \
 		$(BUILD_FLAGS) -ldflags "$(LDFLAGS)" \
@@ -94,7 +93,7 @@ quick: $(BUILD_DIR) deps
 
 # 构建发布版本
 .PHONY: release
-release: $(RELEASE_DIR) build
+release: create-dirs build
 	@echo "创建发布版本..."
 	@cp $(BUILD_DIR)/$(BINARY_NAME) $(RELEASE_DIR)/
 	@cp config.json $(RELEASE_DIR)/config.example.json

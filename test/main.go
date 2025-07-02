@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	basePort    = 8888
+	basePort     = 8888
 	cmdStart     = 1
 	cmdHeartbeat = 2
 	cmdStop      = 3
@@ -156,4 +156,4 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Whoops. There was an error while executing your CLI '%s'", err)
 		os.Exit(1)
 	}
-} 
+}

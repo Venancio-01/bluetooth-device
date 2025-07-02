@@ -1,0 +1,32 @@
+{
+  "devices": [
+    {
+      "serialPath": "/dev/ttyS3",
+      "deviceId": "bluetooth_device_0",
+      "baudRate": 115200,
+      "enabled": true
+    },
+    {
+      "serialPath": "/dev/ttyS2",
+      "deviceId": "bluetooth_device_1",
+      "baudRate": 115200,
+      "enabled": false
+    }
+  ],
+  "rssi": "-53",
+  "useConfigRssi": true,
+  "reportInterval": 2000,
+  "serialTransport": {
+    "serialPath": "/dev/ttyS1",
+    "baudRate": 115200,
+    "dataBits": 8,
+    "stopBits": 1,
+    "parity": "none",
+    "timeout": 5000
+  },
+  "logging": {
+    "level": "info",
+    "enableDevicePrefix": true,
+    "enableTimestamp": true
+  }
+}
